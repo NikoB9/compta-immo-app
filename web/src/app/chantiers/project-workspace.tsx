@@ -464,6 +464,7 @@ export default function ProjectWorkspace() {
       {selectedProject && detail && <>
         <section className="ledger-panel" aria-labelledby="debours-balance-title">
           <h2 id="debours-balance-title">Situation du pot de débours — {selectedProject.name}</h2>
+          <p><a href={`/api/projects/${encodeURIComponent(selectedProject.id)}/export`}>Télécharger l&apos;export complet du chantier (ZIP)</a></p>
           <div className="ledger-bar" aria-live="polite">
             <p><strong>À restituer au propriétaire :</strong> {formatEuroCents(detail.summary.mandataryOwesOwnerCents)}</p>
             <p><strong>À rembourser au mandataire :</strong> {formatEuroCents(detail.summary.ownerOwesMandataryCents)}</p>

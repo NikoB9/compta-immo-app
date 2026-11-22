@@ -66,7 +66,7 @@
 ## Next tasks
 
 1. Configure Cloudflare Access to restrict site entry to the owner and invited emails, bootstrap the owner workspace/address/units, and verify owner/guest isolation. The app creates and validates invitations; adding each invited email to the Cloudflare Access allow policy still requires deployment configuration.
-2. Implement payment-evidence lifecycle, mandate generation/signing, ZIP export bundles, provider sync, and Proxmox deployment.
+2. Implement payment-evidence lifecycle, generated versioned mandate PDF/signing integration, provider sync, and Proxmox deployment.
 3. Add malware scanning, backups, retention, accessibility verification, and a live PostgreSQL/private-volume smoke run before production use.
 4. Run invitation, signing, provider-sync, backup/restore, and private-volume checks as those slices are implemented; keep production deployment blocked until these operational controls are complete.
 
