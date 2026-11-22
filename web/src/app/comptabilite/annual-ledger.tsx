@@ -121,6 +121,7 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
         setSession(data);
         const initialWorkspace = data.workspaces[0]?.workspace_id ?? "";
         setWorkspaceId(initialWorkspace);
+        setLoadingEntries(Boolean(initialWorkspace));
         setBuildingId(data.buildings.find((building) => building.workspace_id === initialWorkspace)?.building_id ?? "");
       })
       .catch((cause: unknown) => {
@@ -133,8 +134,6 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
   useEffect(() => {
     if (!sessionReady || !workspaceId || !validYear) return;
     const controller = new AbortController();
-    setLoadingEntries(true);
-    setEntries([]);
     fetchLedgerEntries(workspaceId, year, controller.signal)
       .then((data) => { setEntries(data); setError(""); })
       .catch((cause: unknown) => {
@@ -147,6 +146,8 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
   function selectYear(event: ChangeEvent<HTMLInputElement>) {
     readId.current += 1;
     setYear(event.target.value);
+    setLoadingEntries(/^\d{4}$/.test(event.target.value) && Number(event.target.value) >= 1900 && Number(event.target.value) <= 2200);
+    setEntries([]);
     setEditing(null);
     setPreview(null);
     setCsvText("");
@@ -161,6 +162,8 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
   function selectWorkspace(nextWorkspaceId: string) {
     const nextBuildingId = session?.buildings.find((building) => building.workspace_id === nextWorkspaceId)?.building_id ?? "";
     setWorkspaceId(nextWorkspaceId);
+    setLoadingEntries(Boolean(nextWorkspaceId));
+    setEntries([]);
     setBuildingId(nextBuildingId);
     setUnitRef("");
     setEditing(null);
