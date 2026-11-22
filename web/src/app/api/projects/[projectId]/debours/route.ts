@@ -48,9 +48,45 @@ export async function GET(request: Request, { params }: RouteContext) {
          ORDER BY m.occurred_on DESC, m.created_at DESC, m.id`,
         [projectRow.workspace_id, projectId],
       );
-      const projectInvoices = await client.query<{ id: string; supplier_name: string; invoice_number: string | null; invoice_date: string | null; invoice_total_cents: string; invoice_document_id: string; extraction_status: "needs_review" | "confirmed" }>(
+      const projectInvoices = await client.query<{
+        id: string;
+        supplier_name: string;
+        invoice_number: string | null;
+        invoice_date: string | null;
+        invoice_total_cents: string;
+        invoice_document_id: string;
+        extraction_status: "needs_review" | "confirmed";
+        line_items: Array<{
+          id: string;
+          lineNumber: number;
+          description: string;
+          quantity: string | null;
+          unit: string | null;
+          unitPriceCents: string | null;
+          amountBasis: "before_tax" | "after_tax" | "unknown";
+          taxRateBasisPoints: number | null;
+          taxAmountCents: string | null;
+          lineTotalCents: string | null;
+          sourcePage: number | null;
+          confidence: string | null;
+          reviewStatus: "needs_review" | "confirmed" | "excluded";
+        }>;
+      }>(
         `SELECT i.id, i.supplier_name, i.invoice_number, i.invoice_date::text,
-                i.invoice_total_cents::text, i.invoice_document_id, i.extraction_status
+                i.invoice_total_cents::text, i.invoice_document_id, i.extraction_status,
+                COALESCE((
+                  SELECT json_agg(json_build_object(
+                    'id', li.id, 'lineNumber', li.line_number, 'description', li.description,
+                    'quantity', li.quantity::text, 'unit', li.unit,
+                    'unitPriceCents', li.unit_price_cents::text, 'amountBasis', li.amount_basis,
+                    'taxRateBasisPoints', li.tax_rate_basis_points,
+                    'taxAmountCents', li.tax_amount_cents::text, 'lineTotalCents', li.line_total_cents::text,
+                    'sourcePage', li.source_page, 'confidence', li.confidence::text,
+                    'reviewStatus', li.review_status
+                  ) ORDER BY li.line_number)
+                  FROM app.invoice_line_item li
+                  WHERE li.workspace_id = i.workspace_id AND li.invoice_id = i.id
+                ), '[]'::json) AS line_items
          FROM app.supplier_invoice i
          JOIN app.project_document d ON d.workspace_id = i.workspace_id AND d.document_id = i.invoice_document_id
          WHERE d.project_id = $1 AND i.workspace_id = $2
@@ -68,6 +104,12 @@ export async function GET(request: Request, { params }: RouteContext) {
           totalCents: safeCents(invoice.invoice_total_cents),
           documentId: invoice.invoice_document_id,
           extractionStatus: invoice.extraction_status,
+          lineItems: invoice.line_items.map((line) => ({
+            ...line,
+            unitPriceCents: line.unitPriceCents === null ? null : safeCents(line.unitPriceCents),
+            taxAmountCents: line.taxAmountCents === null ? null : safeCents(line.taxAmountCents),
+            lineTotalCents: line.lineTotalCents === null ? null : safeCents(line.lineTotalCents),
+          })),
         };
       });
       const rows = movements.rows.map((movement) => {
@@ -135,7 +177,7 @@ export async function POST(request: Request, { params }: RouteContext) {
            WHERE workspace_id = $1 AND invoice_id = $2 AND project_id <> $3 LIMIT 1`,
           [workspaceId, movement.invoiceId, projectId],
         );
-        if (attachedElsewhere.rows.length) throw new LedgerRequestError("Cette facture est déjà rattachée à un autre chantier.", 409);
+        if (attachedElsewhere.rows.length) throw new LedgerRequestError("Cette facture est d�j� rattach�e � un autre chantier.", 409);
         const allocated = await client.query<{ total: string }>(
           `SELECT (
              COALESCE((SELECT SUM(amount_cents) FROM app.invoice_payment WHERE workspace_id = $1 AND invoice_id = $2), 0)
@@ -144,7 +186,7 @@ export async function POST(request: Request, { params }: RouteContext) {
           [workspaceId, movement.invoiceId],
         );
         if (BigInt(allocated.rows[0].total) + BigInt(movement.amountCents) > BigInt(invoice.rows[0].invoice_total_cents)) {
-          throw new LedgerRequestError("Le paiement dépasserait le total de la facture.", 409);
+          throw new LedgerRequestError("Le paiement d�passerait le total de la facture.", 409);
         }
       }
       if (movement.evidenceDocumentId) {
@@ -189,13 +231,13 @@ function parseMovement(body: Record<string, unknown>) {
     throw new LedgerRequestError("Date de mouvement invalide.", 422);
   }
   if (!Number.isSafeInteger(body.amountCents) || (body.amountCents as number) <= 0) {
-    throw new LedgerRequestError("Le montant doit être positif et en centimes entiers.", 422);
+    throw new LedgerRequestError("Le montant doit �tre positif et en centimes entiers.", 422);
   }
   const invoiceId = body.invoiceId == null || body.invoiceId === "" ? null : body.invoiceId;
-  if (invoiceId !== null && !isUuid(invoiceId)) throw new LedgerRequestError("Référence de facture invalide.", 422);
-  if (invoiceId && type !== "supplier_payment") throw new LedgerRequestError("Seul un paiement fournisseur peut être relié à une facture.", 422);
+  if (invoiceId !== null && !isUuid(invoiceId)) throw new LedgerRequestError("R�f�rence de facture invalide.", 422);
+  if (invoiceId && type !== "supplier_payment") throw new LedgerRequestError("Seul un paiement fournisseur peut �tre reli� � une facture.", 422);
   const evidenceDocumentId = body.evidenceDocumentId == null || body.evidenceDocumentId === "" ? null : body.evidenceDocumentId;
-  if (evidenceDocumentId !== null && !isUuid(evidenceDocumentId)) throw new LedgerRequestError("Référence de justificatif invalide.", 422);
+  if (evidenceDocumentId !== null && !isUuid(evidenceDocumentId)) throw new LedgerRequestError("R�f�rence de justificatif invalide.", 422);
   const paidInCash = body.paidInCash === true;
   if (body.paidInCash !== undefined && typeof body.paidInCash !== "boolean") throw new LedgerRequestError("Mode de paiement invalide.", 422);
   if (paidInCash && evidenceDocumentId) throw new LedgerRequestError("Un paiement liquide n'a pas de preuve de virement.", 422);
@@ -239,7 +281,7 @@ function errorResponse(error: unknown) {
   if (error instanceof LedgerRequestError) return json({ error: error.message }, error.status);
   if (error instanceof RequestAuthorizationError) return json({ error: error.message }, error.status);
   if (error instanceof AccessConfigurationError) return json({ error: "Authentication is not configured." }, 503);
-  if ((error as { code?: string } | null)?.code === "23503") return json({ error: "Les références du mouvement sont invalides." }, 422);
+  if ((error as { code?: string } | null)?.code === "23503") return json({ error: "Les r�f�rences du mouvement sont invalides." }, 422);
   console.error("Project debours request failed.");
-  return json({ error: "Le suivi des débours est indisponible." }, 503);
+  return json({ error: "Le suivi des d�bours est indisponible." }, 503);
 }
