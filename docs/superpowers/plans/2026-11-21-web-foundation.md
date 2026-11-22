@@ -15,7 +15,7 @@
 - CSV review status is provenance. Imported rows always return as `needs_review` and are never confirmed by import.
 - Debours balances are operational calculations, not a legal or tax classification.
 - No service worker or offline cache is enabled; private data must never enter a public cache.
-- No production deploy or remote push from this worktree.
+- No production deploy. Push only generic source and documentation to the public repository.
 
 ## Implemented
 
@@ -42,7 +42,8 @@
 
 - Project UI/API now creates projects by address, adds project invoices with manual supplier/date/number/total fields and uploaded documents, records advances/payments/reimbursements/refunds/returns, and shows the two-way debours reconciliation. Existing project guests can read assigned-project data; all mutation routes enforce owner access. Invoice/payment amounts stay marked for review; OCR is not implemented.
 - Planned invoice extraction explicitly includes every detected product/service line, editable source-traceable fields, and permission-scoped filtering/search by invoice and line-item amount/text.
-- Added an in-app fiscal guardrail note and linked official tax sources. It distinguishes the VAT definition of débours from French property-income expense deductibility and flags pre-letting work for human review; it makes no tax qualification. Supporting source notes are in docs/tax-guardrails.md.
+- Added PostgreSQL storage for OCR runs and product/service lines with source page, confidence, review state, tax amount/rate fields, workspace RLS, guest project read policy, and runtime grants. The project invoice API returns these rows; the chantier UI displays them and filters invoices by supplier/reference/product text and by invoice or line amount. OCR execution and editing/confirmation controls remain unimplemented.
+- Added an in-app fiscal guardrail note and linked official tax sources. It distinguishes the VAT definition of d�bours from French property-income expense deductibility and flags pre-letting work for human review; it makes no tax qualification. Supporting source notes are in docs/tax-guardrails.md.
 
 ## Verification status (updated 2026-11-22)
 
@@ -55,18 +56,19 @@
 - PostgreSQL migration and RLS smoke script are added but have not been executed in this Windows environment; `psql` is unavailable and the local Docker engine is inaccessible. The PostgreSQL 18 CI job will execute them after a remote repository is connected.
 - `npx tsc --noEmit --incremental false`: passed with the Access verifier, PostgreSQL pool, and session API.
 - `npx tsc --noEmit --incremental false`: passed with the ledger endpoints and UI integration.
+- `npx tsc --noEmit --incremental false`: attempted after invoice line-item API/UI changes, but the process produced no output and did not finish within 30 seconds; no pass is claimed.
 - Webpack compiled the complete app successfully with `webpackBuildWorker` disabled for diagnosis, but the build then failed during static output work with Windows OneDrive `EPERM`. The default Turbopack build also cannot create a junction for the external `pg` package (OS access denied). GitHub CI runs on Linux.
-- PostgreSQL migrations, constraints, runtime grants and the session/ledger APIs have not been executed against a database in this environment; `psql` is unavailable and Docker is inaccessible.
+- PostgreSQL migrations, constraints, runtime grants and the session/ledger APIs have not been executed against a database in this environment; `psql` is unavailable and Docker is inaccessible. Migration 0005 adds invoice extraction runs and line items but also awaits live execution.
 - Invoice upload/preview and project movement/invoice routes have not been exercised against a mounted private volume or live PostgreSQL database in this environment.
 
 ## Next tasks
 
 1. Run PostgreSQL 18 migrations and RLS smoke checks in CI; the schema and session/ledger routes have not yet been exercised against a live database.
 2. Configure Cloudflare Access, bootstrap the owner workspace/address/units, provision invited guests, implement invitation acceptance and verify owner/guest flows.
-3. Implement local invoice OCR for supplier/date/reference/totals and all product/service lines, with a correction table, per-field confidence/source-page trace, and no silent calculation or tax classification. Add indexed search/filter over invoices and lines, scoped by project/property permissions.
+3. Implement local invoice OCR for supplier/date/reference/totals and all product/service lines, with a correction table, per-field confidence/source-page trace, and no silent calculation or tax classification. Add per-field editing/confirmation and server-side indexed search/filter over invoices and lines, scoped by project/property permissions.
 4. Implement project invitations and acceptance, payment evidence lifecycle, mandate generation/signing, ZIP export bundles, provider sync, and Proxmox deployment.
 5. Add malware scanning, backups, retention, accessible component verification, and a live PostgreSQL/private-volume smoke run before production use.
-6. Create or connect the public GitHub repository, run CI on this branch and resolve the local ESLint/config loading stall.
+6. Run CI on the connected public GitHub repository and resolve the local ESLint/config loading stall.
 
 ## Key files
 
