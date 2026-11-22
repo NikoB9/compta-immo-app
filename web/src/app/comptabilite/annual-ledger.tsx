@@ -41,19 +41,19 @@ async function postJson(url: string, method: string, body: unknown) {
     cache: "no-store",
   });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "La requête n'a pas abouti.");
+  if (!response.ok) throw new Error(result.error || "La requ�te n'a pas abouti.");
   return result;
 }
 
 function EntryTable({ rows, edit, remove, attach }: { rows: Entry[]; edit?: (row: Entry) => void; remove?: (id: string) => void; attach?: (row: Entry, file: File) => void }) {
   return (
-    <div className="ledger-table" tabIndex={0} role="region" aria-label={remove ? "Écritures du registre" : "Écritures à importer"}>
+    <div className="ledger-table" tabIndex={0} role="region" aria-label={remove ? "�critures du registre" : "�critures � importer"}>
       <table>
-        <thead><tr><th scope="col">Date</th><th scope="col">Libellé</th><th scope="col">Type</th><th scope="col">Total payé</th><th scope="col">Part administrative</th><th scope="col">Frais annexes internes</th>{remove && <><th scope="col">Fichier(s)</th><th scope="col">Action</th></>}</tr></thead>
+        <thead><tr><th scope="col">Date</th><th scope="col">Libell�</th><th scope="col">Type</th><th scope="col">Total pay�</th><th scope="col">Part administrative</th><th scope="col">Frais annexes internes</th>{remove && <><th scope="col">Fichier(s)</th><th scope="col">Action</th></>}</tr></thead>
         <tbody>{rows.map((row) => (
           <tr key={row.id}>
-            <td>{row.occurredOn}</td><td>{row.description || "Sans libellé"}</td>
-            <td>{row.entryType === "income" ? "Recette" : "Dépense"}</td><td>{formatEuroCents(row.amountCents!)}</td>
+            <td>{row.occurredOn}</td><td>{row.description || "Sans libell�"}</td>
+            <td>{row.entryType === "income" ? "Recette" : "D�pense"}</td><td>{formatEuroCents(row.amountCents!)}</td>
             <td>{formatEuroCents(row.administrativeAmountCents ?? row.amountCents!)}</td>
             <td>{formatEuroCents(row.internalOnlyCents ?? 0)}</td>
             {remove && <td>
@@ -65,8 +65,8 @@ function EntryTable({ rows, edit, remove, attach }: { rows: Entry[]; edit?: (row
               }} /></label>}
             </td>}
             {remove && <td className="ledger-actions">
-              {edit && <button type="button" aria-label={`Modifier l’écriture : ${row.description || row.id}`} onClick={() => edit(row)}>Modifier</button>}
-              <button type="button" aria-label={`Supprimer l’écriture : ${row.description || row.id}`} onClick={() => remove(row.id)}>Supprimer</button>
+              {edit && <button type="button" aria-label={`Modifier l'�criture : ${row.description || row.id}`} onClick={() => edit(row)}>Modifier</button>}
+              <button type="button" aria-label={`Supprimer l'�criture : ${row.description || row.id}`} onClick={() => remove(row.id)}>Supprimer</button>
             </td>}
           </tr>
         ))}</tbody>
@@ -131,13 +131,7 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
   }, []);
 
   useEffect(() => {
-    if (!sessionReady || !workspaceId || !validYear) {
-      if (sessionReady) {
-        setEntries([]);
-        setLoadingEntries(false);
-      }
-      return;
-    }
+    if (!sessionReady || !workspaceId || !validYear) return;
     const controller = new AbortController();
     setLoadingEntries(true);
     setEntries([]);
@@ -204,7 +198,7 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
         setPreview(parseAnnualLedgerCsv(content, { expectedTaxYear: Number(year) }));
       }
     } catch {
-      if (operation === readId.current) setError("Impossible de lire ce fichier. Vérifiez qu’il est encodé en UTF-8.");
+      if (operation === readId.current) setError("Impossible de lire ce fichier. V�rifiez qu'il est encod� en UTF-8.");
     } finally {
       if (operation === readId.current) setReading(false);
     }
@@ -224,7 +218,7 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
       });
       const latest = await fetchLedgerEntries(workspaceId, year);
       setEntries(latest);
-      setMessage(`${result.imported} écriture(s) enregistrée(s) dans le registre.`);
+      setMessage(`${result.imported} �criture(s) enregistr�e(s) dans le registre.`);
       setPreview(null);
       setCsvText("");
     } catch (cause) {
@@ -243,7 +237,7 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
     const data = new FormData(form);
     const occurredOn = String(data.get("date"));
     if (occurredOn.slice(0, 4) !== year) {
-      setError("Choisissez une date de paiement ou d’encaissement dans l’année affichée.");
+      setError("Choisissez une date de paiement ou d'encaissement dans l'ann�e affich�e.");
       return;
     }
     let amountCents: number;
@@ -252,12 +246,12 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
       if (amountCents === 0) throw new RangeError();
       if (safeAdministrativeShare > amountCents) throw new RangeError();
     } catch {
-      setError("Saisissez un montant positif avec au plus deux décimales, par exemple 125,50.");
+      setError("Saisissez un montant positif avec au plus deux d�cimales, par exemple 125,50.");
       return;
     }
     const description = String(data.get("description")).trim();
     if (!description) {
-      setError("Saisissez un libellé.");
+      setError("Saisissez un libell�.");
       return;
     }
     const id = editing?.id ?? (globalThis.crypto?.randomUUID?.() ?? `manual-${Date.now()}-${++formId.current}`);
@@ -274,7 +268,7 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
     try {
       await postJson("/api/accounting/entries", editing ? "PATCH" : "POST", { workspaceId, entry });
       setEntries(await fetchLedgerEntries(workspaceId, year));
-      setMessage(editing ? "Écriture modifiée." : "Écriture enregistrée.");
+      setMessage(editing ? "�criture modifi�e." : "�criture enregistr�e.");
       setEditing(null);
       setUnitRef("");
       form.reset();
@@ -300,7 +294,7 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
       anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
-      setError("Export impossible. Vérifiez les champs de texte qui commencent par un signe de formule de tableur.");
+      setError("Export impossible. V�rifiez les champs de texte qui commencent par un signe de formule de tableur.");
     }
   }
 
@@ -309,7 +303,7 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
     setError("");
     setMessage("");
     if (file.size === 0 || file.size > 25 * 1024 * 1024) {
-      setError("Le fichier doit contenir des données et faire au plus 25 Mio.");
+      setError("Le fichier doit contenir des donn�es et faire au plus 25 Mio.");
       return;
     }
     setUploading(true);
@@ -326,11 +320,11 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
         cache: "no-store",
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "L'ajout du document a échoué.");
+      if (!response.ok) throw new Error(result.error || "L'ajout du document a �chou�.");
       setEntries(await fetchLedgerEntries(workspaceId, year));
-      setMessage(`Document « ${result.originalFilename} » ajouté à l'écriture.`);
+      setMessage(`Document � ${result.originalFilename} � ajout� � l'�criture.`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "L'ajout du document a échoué.");
+      setError(cause instanceof Error ? cause.message : "L'ajout du document a �chou�.");
     } finally {
       setUploading(false);
     }
@@ -345,7 +339,7 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
       await postJson("/api/accounting/entries", "DELETE", { workspaceId, id });
       setEntries(await fetchLedgerEntries(workspaceId, year));
       if (editing?.id === id) setEditing(null);
-      setMessage("Écriture supprimée du registre.");
+      setMessage("�criture supprim�e du registre.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Suppression impossible.");
     } finally {
@@ -361,34 +355,34 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
             {session.workspaces.map((workspace) => <option key={workspace.workspace_id} value={workspace.workspace_id}>{workspace.workspace_name}</option>)}
           </select></label>
           <label>Adresse<select value={buildingId} disabled={saving || reading || workspaceBuildings.length === 0} onChange={(event) => selectBuilding(event.target.value)}>
-            {workspaceBuildings.map((building) => <option key={building.building_id} value={building.building_id}>{building.building_label} — {building.address_line1}, {building.postal_code} {building.locality}</option>)}
+            {workspaceBuildings.map((building) => <option key={building.building_id} value={building.building_id}>{building.building_label} - {building.address_line1}, {building.postal_code} {building.locality}</option>)}
           </select></label>
-        </> : sessionReady ? <p role="alert">Aucun espace de comptabilité n’est associé à ce compte.</p> : <p role="status">Chargement du compte…</p>}
-        <label>Année fiscale<input type="number" min="1900" max="2200" step="1" value={year} disabled={saving || reading} onChange={selectYear} /></label>
-        <button type="button" onClick={download} disabled={!rows.length || !validYear}>Télécharger le CSV</button>
+        </> : sessionReady ? <p role="alert">Aucun espace de comptabilit� n'est associ� � ce compte.</p> : <p role="status">Chargement du compte.</p>}
+        <label>Ann�e fiscale<input type="number" min="1900" max="2200" step="1" value={year} disabled={saving || reading} onChange={selectYear} /></label>
+        <button type="button" onClick={download} disabled={!rows.length || !validYear}>T�l�charger le CSV</button>
       </div>
-      {loadingEntries && <p role="status">Chargement du registre…</p>}
-      {!validYear && <p role="alert">Saisissez une année entre 1900 et 2200.</p>}
+      {loadingEntries && <p role="status">Chargement du registre.</p>}
+      {!validYear && <p role="alert">Saisissez une ann�e entre 1900 et 2200.</p>}
       {error && <p role="alert" className="ledger-error">{error}</p>}
       {message && <p role="status">{message}</p>}
 
       <section className="ledger-panel" aria-labelledby="add-entry-title">
-        <h2 id="add-entry-title">{editing ? "Modifier l’écriture" : "Ajouter une écriture"}</h2>
+        <h2 id="add-entry-title">{editing ? "Modifier l'�criture" : "Ajouter une �criture"}</h2>
         <form key={editing?.id ?? "new"} className="ledger-bar" onSubmit={saveEntry}>
-          <label>Date de paiement ou d’encaissement<input type="date" name="date" defaultValue={editing?.occurredOn} required /></label>
-          <label>Type<select name="type" defaultValue={editing?.entryType ?? "expense"}><option value="expense">Dépense</option><option value="income">Recette</option></select></label>
-          <label>Libellé<input name="description" defaultValue={editing?.description} required maxLength={2000} /></label>
-          <label>Appartement (facultatif)<select name="unit" value={unitRef} onChange={(event) => setUnitRef(event.target.value)}><option value="">Toute l’adresse</option>{selectedBuilding?.units.map((unit) => <option key={unit.id} value={unit.reference}>{unit.reference}</option>)}</select></label>
-          <label>Total payé (€)<input name="amount" value={amountText} onChange={(event) => {
+          <label>Date de paiement ou d'encaissement<input type="date" name="date" defaultValue={editing?.occurredOn} required /></label>
+          <label>Type<select name="type" defaultValue={editing?.entryType ?? "expense"}><option value="expense">D�pense</option><option value="income">Recette</option></select></label>
+          <label>Libell�<input name="description" defaultValue={editing?.description} required maxLength={2000} /></label>
+          <label>Appartement (facultatif)<select name="unit" value={unitRef} onChange={(event) => setUnitRef(event.target.value)}><option value="">Toute l'adresse</option>{selectedBuilding?.units.map((unit) => <option key={unit.id} value={unit.reference}>{unit.reference}</option>)}</select></label>
+          <label>Total pay� (?)<input name="amount" value={amountText} onChange={(event) => {
             setAmountText(event.target.value);
             try { const cents = parseEuroToCents(event.target.value); setAdministrativeShareCents((current) => shareManuallySet ? Math.min(current, cents) : cents); } catch { setAdministrativeShareCents(0); }
           }} inputMode="decimal" required maxLength={32} /></label>
           <label>Part administrative<input type="range" min="0" max={totalCents} step="1" value={safeAdministrativeShare}
-            aria-label="Part administrative dans le total payé" onChange={(event) => { setAdministrativeShareCents(Number(event.target.value)); setShareManuallySet(true); }} />
+            aria-label="Part administrative dans le total pay�" onChange={(event) => { setAdministrativeShareCents(Number(event.target.value)); setShareManuallySet(true); }} />
             <output>{formatEuroCents(safeAdministrativeShare)}</output>
           </label>
           <p>Frais annexes internes hors export administratif : {formatEuroCents(internalShareCents)}</p>
-          <button disabled={!validYear || !workspaceId || !buildingId || saving}>{saving ? "Enregistrement…" : editing ? "Enregistrer la modification" : "Ajouter"}</button>
+          <button disabled={!validYear || !workspaceId || !buildingId || saving}>{saving ? "Enregistrement." : editing ? "Enregistrer la modification" : "Ajouter"}</button>
           {editing && <button type="button" onClick={() => { setEditing(null); setUnitRef(""); setAmountText(""); setAdministrativeShareCents(0); setShareManuallySet(false); }}>Annuler la modification</button>}
         </form>
       </section>
@@ -396,25 +390,25 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
       <section className="ledger-panel" aria-labelledby="import-title">
         <h2 id="import-title">Importer un registre CSV</h2>
         <label>Fichier CSV au format Compta Immo<input type="file" accept=".csv,text/csv" onChange={loadCsv} disabled={!validYear || !workspaceId || !buildingId || saving || reading} /></label>
-        {reading && <p role="status">Lecture du fichier…</p>}
+        {reading && <p role="status">Lecture du fichier.</p>}
         {preview && (
           <>
             <p role="status">{preview.rows.length} ligne(s) valide(s), {preview.errors.length} erreur(s).</p>
-            {!preview.canImport && <p>Corrigez les erreurs dans le fichier puis importez-le à nouveau.</p>}
-            {preview.errors.length > 0 && <ul className="ledger-error">{preview.errors.slice(0, 20).map((item, index) => <li key={index}>Enregistrement {item.row} · {item.field} · {item.message}</li>)}</ul>}
-            {conflicts.length > 0 && <p role="alert" className="ledger-error">{conflicts.length} identifiant(s) existent déjà dans le registre. Retirez les lignes en double du fichier avant de le réimporter.</p>}
+            {!preview.canImport && <p>Corrigez les erreurs dans le fichier puis importez-le � nouveau.</p>}
+            {preview.errors.length > 0 && <ul className="ledger-error">{preview.errors.slice(0, 20).map((item, index) => <li key={index}>Enregistrement {item.row} � {item.field} � {item.message}</li>)}</ul>}
+            {conflicts.length > 0 && <p role="alert" className="ledger-error">{conflicts.length} identifiant(s) existent d�j� dans le registre. Retirez les lignes en double du fichier avant de le r�importer.</p>}
             {preview.rows.length > 0 && <EntryTable rows={preview.rows.slice(0, 20)} />}
-            {preview.rows.length > 20 && <p>Aperçu des 20 premières lignes valides.</p>}
+            {preview.rows.length > 20 && <p>Aper�u des 20 premi�res lignes valides.</p>}
             <div className="ledger-bar">
               <button type="button" onClick={acceptPreview} disabled={!preview.canImport || !preview.rows.length || conflicts.length > 0 || saving || reading}>Confirmer l'import</button>
-              <button type="button" onClick={() => setPreview(null)}>Annuler l’import</button>
+              <button type="button" onClick={() => setPreview(null)}>Annuler l'import</button>
             </div>
           </>
         )}
       </section>
 
       <section className="ledger-panel" aria-labelledby="entries-title">
-        <h2 id="entries-title">Écritures de l’année</h2>
+        <h2 id="entries-title">�critures de l'ann�e</h2>
         {rows.length ? <EntryTable rows={rows} attach={(row, file) => { void attachDocument(row, file); }} edit={(row) => {
           setEditing(row);
           setBuildingId(row.buildingRef ?? buildingId);
@@ -425,8 +419,8 @@ export default function AnnualLedger({ initialYear }: { initialYear: number }) {
           setError("");
           setMessage("");
           document.getElementById("add-entry-title")?.scrollIntoView();
-        }} remove={(id) => { void deleteEntry(id); }} /> : loadingEntries ? <p>Chargement du registre…</p> : <p>Aucune écriture pour cette année.</p>}
-        {uploading && <p role="status">Ajout et vérification du document.</p>}
+        }} remove={(id) => { void deleteEntry(id); }} /> : loadingEntries ? <p>Chargement du registre.</p> : <p>Aucune �criture pour cette ann�e.</p>}
+        {uploading && <p role="status">Ajout et v�rification du document.</p>}
       </section>
     </>
   );
