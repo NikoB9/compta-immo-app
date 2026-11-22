@@ -18,6 +18,9 @@ export async function POST(request: Request, { params }: RouteContext) {
       || (body.signatureImageDocumentId !== null && body.signatureImageDocumentId !== undefined && !isUuid(body.signatureImageDocumentId))) {
       throw new LedgerRequestError("La confirmation ou les informations de signature sont invalides.", 422);
     }
+    const partyRole = body.partyRole as "mandant" | "mandataire";
+    const signerName = (body.signerName as string).trim();
+    const signatureImageDocumentId = typeof body.signatureImageDocumentId === "string" ? body.signatureImageDocumentId : null;
     const result = await withAuthenticatedActor(request, async (client, identity, actorId) => {
       const query = await client.query<{
         id: string; workspace_id: string; project_id: string; title: string; content_sha256: string;
@@ -28,14 +31,14 @@ export async function POST(request: Request, { params }: RouteContext) {
       );
       const mandate = query.rows[0];
       if (!mandate) throw new LedgerRequestError("Mandat introuvable.", 404);
-      const party = mandate.mandate_data.parties?.[body.partyRole as "mandant" | "mandataire"];
+      const party = mandate.mandate_data.parties?.[partyRole];
       if (!party?.email || party.email.toLowerCase() !== identity.email.toLowerCase()) {
-        throw new LedgerRequestError("Le compte authentifié ne correspond pas à l’e-mail de cette partie.", 403);
+        throw new RequestAuthorizationError("Le compte authentifié ne correspond pas à l’e-mail de cette partie.", 403);
       }
-      if (body.signatureImageDocumentId) {
+      if (signatureImageDocumentId) {
         const linked = await client.query(
           `SELECT 1 FROM app.project_document WHERE project_id = $1 AND workspace_id = $2 AND document_id = $3`,
-          [projectId, mandate.workspace_id, body.signatureImageDocumentId],
+          [projectId, mandate.workspace_id, signatureImageDocumentId],
         );
         if (!linked.rows[0]) throw new LedgerRequestError("L’image de signature doit d’abord être ajoutée aux documents de ce chantier.", 422);
       }
@@ -47,10 +50,10 @@ export async function POST(request: Request, { params }: RouteContext) {
          RETURNING id, party_role AS "partyRole", signer_email AS "signerEmail", signer_name AS "signerName",
                    consent_text AS "consentText", content_sha256 AS "contentSha256",
                    signature_image_document_id AS "signatureImageDocumentId", signed_at AS "signedAt"`,
-        [mandate.workspace_id, projectId, mandateId, body.partyRole, actorId, identity.email.toLowerCase(), body.signerName.trim(), CONSENT, mandate.content_sha256, body.signatureImageDocumentId ?? null],
+        [mandate.workspace_id, projectId, mandateId, partyRole, actorId, identity.email.toLowerCase(), signerName, CONSENT, mandate.content_sha256, signatureImageDocumentId],
       );
       await appendAuditEvent(client, mandate.workspace_id, actorId, "project_mandate_signed", mandateId, {
-        partyRole: body.partyRole, signerEmail: identity.email.toLowerCase(), contentSha256: mandate.content_sha256,
+        partyRole, signerEmail: identity.email.toLowerCase(), contentSha256: mandate.content_sha256,
       }, "project_mandate");
       return inserted.rows[0];
     });

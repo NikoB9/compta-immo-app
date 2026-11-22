@@ -42,6 +42,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     if (typeof body.title !== "string" || body.title.trim().length < 1 || body.title.trim().length > 200) {
       throw new LedgerRequestError("Le titre du mandat est invalide.", 422);
     }
+    const title = body.title.trim();
     const mandateData = validateMandateData(body.mandateData);
     const contentSha256 = createHash("sha256").update(stableStringify(mandateData)).digest("hex");
     const mandate = await withAuthenticatedActor(request, async (client, _identity, actorId) => {
@@ -55,7 +56,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         `INSERT INTO app.project_mandate (workspace_id, project_id, title, mandate_data, content_sha256, created_by)
          VALUES ($1, $2, $3, $4::jsonb, $5, $6)
          RETURNING id, title, mandate_data AS "mandateData", content_sha256 AS "contentSha256", created_at AS "createdAt"`,
-        [workspaceId, projectId, body.title.trim(), JSON.stringify(mandateData), contentSha256, actorId],
+        [workspaceId, projectId, title, JSON.stringify(mandateData), contentSha256, actorId],
       );
       await appendAuditEvent(client, workspaceId, actorId, "project_mandate_created", inserted.rows[0].id, { contentSha256 }, "project_mandate");
       return inserted.rows[0];
