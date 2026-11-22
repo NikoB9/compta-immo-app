@@ -571,6 +571,7 @@ export default function ProjectWorkspace() {
               <small>Empreinte du contenu signé (SHA-256) : {mandate.contentSha256}</small>
             </article>
             <button type="button" onClick={() => { setPrintingMandateId(mandate.id); window.setTimeout(() => window.print(), 100); }}>Imprimer / enregistrer en PDF</button>
+            <a href={`/api/projects/${encodeURIComponent(selectedProject.id)}/mandates/${encodeURIComponent(mandate.id)}/pdf`}>Télécharger le PDF versionné</a>
             {mandate.yourPartyRole && !mandate.signatures.some((signature) => signature.partyRole === mandate.yourPartyRole) && <form className="ledger-bar" onSubmit={(event) => void signMandate(event, mandate)}>
               <label>Nom affiché pour la signature<input name="signerName" defaultValue={mandate.mandateData.parties[mandate.yourPartyRole].name} required maxLength={200} /></label>
               {selectedProject.can_edit && <label>Image facultative pour le rendu<input name="signatureImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>}

@@ -36,7 +36,7 @@ A modular, self-hosted PWA for French real-estate owners to track properties, ap
 
 Current implementation: owners can add, replace or detach a movement's payment evidence after entry. Each change is recorded in the audit log; previously attached documents remain preserved in project storage. Guests have read-only access.
 
-Current implementation: the authenticated project ZIP includes a JSON index, French semicolon-separated invoice/movement register, mandate and signature metadata, and integrity-checked evidence. It is limited to 100 documents and 100 MiB per archive.
+Current implementation: the authenticated project ZIP includes a JSON index, French semicolon-separated invoice/movement register, a versioned PDF for each mandate, signature metadata, and integrity-checked evidence. It is limited to 100 evidence files and mandates combined and 100 MiB per archive.
 
 ## Mandates and signatures
 
@@ -44,7 +44,7 @@ Current implementation: the authenticated project ZIP includes a JSON index, Fre
 - Support an optional user-selected signature appearance (drawn, typed or uploaded) per signer. That image is visual only, not proof by itself.
 - Signature evidence must bind signer's verified identity and consent, document digest, version, timestamp, and event log; use a specialist signature provider after legal review of the required level.
 
-Implementation status: mandate drafts, party-specific signing tied to verified Cloudflare Access email, first-signature content lock, digest and event logging are available. The current generic form has fields for purchase limits, authorized materials, terms, and validity dates. It prints through the browser and can include an owner-uploaded signature image. It does not yet reproduce the supplied template exactly, generate a PDF artifact in the application, provide individual image selection for every signer, or establish legal sufficiency. Keep this path under review until the actual template, output artifact, and required signature assurance are agreed and checked.
+Implementation status: mandate drafts, party-specific signing tied to verified Cloudflare Access email, first-signature content lock, canonical-data digest, audit logging, and on-demand PDF generation from the clean `mandat-debours-v1.0` template are available. PDFs are also included in project ZIP exports. The digest in each PDF identifies canonical mandate data, not the rendered PDF bytes. Optional signature images remain separate visual files and are not embedded. The generated template does not reproduce the supplied example exactly, and the app does not provide a specialist or qualified signature service. Check the template and required assurance level before production use.
 
 ## Authentication and authorization
 

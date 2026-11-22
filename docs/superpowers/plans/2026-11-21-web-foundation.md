@@ -66,7 +66,7 @@
 ## Next tasks
 
 1. Configure Cloudflare Access to restrict site entry to the owner and invited emails, bootstrap the owner workspace/address/units, and verify owner/guest isolation. The app creates and validates invitations; adding each invited email to the Cloudflare Access allow policy still requires deployment configuration.
-2. Implement generated versioned mandate PDF/signing integration, provider sync, and Proxmox deployment.
+2. Integrate a specialist signing provider, provider sync, and Proxmox deployment. The current versioned PDF uses a fresh generic template; the supplied example and required signature assurance still need review before production.
 3. Add malware scanning, backups, retention, accessibility verification, and a live PostgreSQL/private-volume smoke run before production use.
 4. Run invitation, signing, provider-sync, backup/restore, and private-volume checks as those slices are implemented; keep production deployment blocked until these operational controls are complete.
 

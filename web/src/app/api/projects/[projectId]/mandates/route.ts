@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import { AccessConfigurationError } from "@/server/auth/cloudflare-access";
 import { RequestAuthorizationError, withAuthenticatedActor } from "@/server/auth/authenticated-actor";
+import { mandateDataSha256 } from "@/server/mandate-pdf";
 import { readUtf8Body, RequestBodyError } from "@/server/http/request-body";
 import { appendAuditEvent, isUuid, LedgerRequestError, requireOwnedWorkspace } from "@/server/ledger/repository";
 
@@ -44,7 +44,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     }
     const title = body.title.trim();
     const mandateData = validateMandateData(body.mandateData);
-    const contentSha256 = createHash("sha256").update(stableStringify(mandateData)).digest("hex");
+    const contentSha256 = mandateDataSha256(mandateData);
     const mandate = await withAuthenticatedActor(request, async (client, _identity, actorId) => {
       const project = await client.query<{ workspace_id: string }>(
         "SELECT workspace_id FROM app.construction_project WHERE id = $1", [projectId],
@@ -103,13 +103,6 @@ export function validateMandateData(value: unknown) {
   };
 }
 
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`).join(",")}}`;
-  }
-  return JSON.stringify(value) ?? "null";
-}
 function isText(value: unknown, min: number, max: number): value is string { return typeof value === "string" && value.trim().length >= min && value.length <= max && !value.includes("\0"); }
 function isEmail(value: unknown) { return isText(value, 3, 320) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
 function isDate(value: unknown) {

@@ -2,12 +2,13 @@ import { createHash } from "node:crypto";
 import { AccessConfigurationError } from "@/server/auth/cloudflare-access";
 import { RequestAuthorizationError, withAuthenticatedActor } from "@/server/auth/authenticated-actor";
 import { PrivateDocumentError, readPrivateDocument } from "@/server/documents/private-store";
+import { mandateDataSha256, MANDATE_TEMPLATE_VERSION, renderMandatePdf, type MandatePdfData } from "@/server/mandate-pdf";
 import { createZip, type ZipEntry } from "@/server/project-export-zip";
 import { isUuid, LedgerRequestError } from "@/server/ledger/repository";
 
 export const runtime = "nodejs";
 const MAX_ARCHIVE_BYTES = 100 * 1024 * 1024;
-const MAX_DOCUMENTS = 100;
+const MAX_ARCHIVE_ITEMS = 100;
 const MAX_ROWS_PER_SECTION = 10_000;
 
 type RouteContext = { params: Promise<{ projectId: string }> };
@@ -44,12 +45,12 @@ export async function GET(request: Request, { params }: RouteContext) {
            FROM app.project_movement m WHERE m.project_id = $1
            ORDER BY m.occurred_on, m.created_at, m.id`, [projectId],
         ),
-        client.query(
+        client.query<MandatePdfData & { id: string }>(
           `SELECT m.id, m.title, m.mandate_data AS "mandateData", m.content_sha256 AS "contentSha256",
-                  m.created_at AS "createdAt",
+                  m.created_at::text AS "createdAt",
                   COALESCE((SELECT json_agg(json_build_object(
                     'partyRole', s.party_role, 'signerEmail', s.signer_email, 'signerName', s.signer_name,
-                    'consentText', s.consent_text, 'contentSha256', s.content_sha256,
+                    'consentText', s.consent_text,
                     'signatureImageDocumentId', s.signature_image_document_id, 'signedAt', s.signed_at
                   ) ORDER BY s.signed_at)
                   FROM app.project_mandate_signature s WHERE s.mandate_id = m.id), '[]'::json) AS signatures
@@ -68,7 +69,7 @@ export async function GET(request: Request, { params }: RouteContext) {
         || mandates.rows.length > MAX_ROWS_PER_SECTION) {
         throw new LedgerRequestError("Ce chantier contient trop d’éléments pour un export unique.", 422);
       }
-      if (documentRows.rows.length > MAX_DOCUMENTS) throw new LedgerRequestError("Ce chantier contient trop de pièces pour un seul export. Exportez-le en lots après avoir réduit les pièces jointes.", 422);
+      if (documentRows.rows.length + mandates.rows.length > MAX_ARCHIVE_ITEMS) throw new LedgerRequestError("Ce chantier contient trop de pièces et de mandats pour un seul export. Réduisez le nombre d’éléments.", 422);
 
       const evidenceFiles: Array<{ id: string; path: string; originalFilename: string; mediaType: string; byteSize: number; sha256: string }> = [];
       const entries: ZipEntry[] = [];
@@ -82,11 +83,21 @@ export async function GET(request: Request, { params }: RouteContext) {
         if (bytes.byteLength !== expectedBytes || createHash("sha256").update(bytes).digest("hex") !== document.sha256.trim()) {
           throw new PrivateDocumentError("Une pièce jointe est incomplète ou son intégrité est compromise.", 503);
         }
-        const extension = safeExtension(document.original_filename, document.media_type);
+        const extension = safeExtension(document.media_type);
         const path = `evidence/${document.id}${extension}`;
         entries.push({ name: path, bytes });
         totalBytes += bytes.byteLength;
         evidenceFiles.push({ id: document.id, path, originalFilename: document.original_filename, mediaType: document.media_type, byteSize: expectedBytes, sha256: document.sha256.trim() });
+      }
+
+      const mandatePdfPaths = new Map<string, string>();
+      for (const mandate of mandates.rows) {
+        if (mandateDataSha256(mandate.mandateData) !== mandate.contentSha256.trim()) {
+          throw new LedgerRequestError("Le contenu d’un mandat ne correspond plus à son empreinte enregistrée.", 409);
+        }
+        const path = `mandates/${mandate.id}-${MANDATE_TEMPLATE_VERSION}.pdf`;
+        entries.push({ name: path, bytes: renderMandatePdf(mandate) });
+        mandatePdfPaths.set(mandate.id, path);
       }
 
       const projectData = project.rows[0];
@@ -96,7 +107,7 @@ export async function GET(request: Request, { params }: RouteContext) {
         project: projectData,
         invoices: invoices.rows,
         movements: movements.rows,
-        mandates: mandates.rows,
+        mandates: mandates.rows.map((mandate) => ({ ...mandate, templateVersion: MANDATE_TEMPLATE_VERSION, pdfPath: mandatePdfPaths.get(mandate.id) })),
         evidenceFiles,
       };
       const csv = createLedgerCsv(invoices.rows, movements.rows, evidenceFiles);
@@ -160,9 +171,7 @@ function csvCell(value: unknown) {
   return `"${safe.replaceAll('"', '""')}"`;
 }
 
-function safeExtension(filename: string, mediaType: string) {
-  const extension = filename.match(/\.[a-zA-Z0-9]{1,10}$/)?.[0].toLowerCase();
-  if (extension) return extension;
+function safeExtension(mediaType: string) {
   return ({ "application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp" } as Record<string, string>)[mediaType] ?? ".bin";
 }
 
