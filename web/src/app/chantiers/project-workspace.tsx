@@ -156,7 +156,7 @@ export default function ProjectWorkspace() {
   }, [projectId, selectedProject?.can_edit]);
 
   useEffect(() => {
-    if (!projectId) { setMandates([]); return; }
+    if (!projectId) return;
     let active = true;
     jsonRequest(`/api/projects/${encodeURIComponent(projectId)}/mandates`).then((result: Mandate[]) => {
       if (active) setMandates(result);

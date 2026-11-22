@@ -87,7 +87,4 @@ CREATE POLICY project_mandate_signature_party_insert ON app.project_mandate_sign
   )
 );
 
-GRANT SELECT, INSERT, UPDATE ON app.project_mandate TO app_runtime;
-GRANT SELECT, INSERT ON app.project_mandate_signature TO app_runtime;
-
 COMMIT;
