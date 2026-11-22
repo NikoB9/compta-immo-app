@@ -93,7 +93,6 @@ export default function ProjectWorkspace() {
   useEffect(() => {
     if (!workspaceId && !session?.projects.length) return;
     let active = true;
-    setLoading(true);
     const projectsUrl = workspaceId ? `/api/projects?workspaceId=${encodeURIComponent(workspaceId)}` : "/api/projects";
     jsonRequest(projectsUrl).then((result: Project[]) => {
       if (!active) return;
@@ -216,14 +215,14 @@ export default function ProjectWorkspace() {
       {error && <p role="alert" className="ledger-error">{error}</p>}
       {message && <p role="status">{message}</p>}
       {session?.workspaces.length ? <div className="ledger-bar">
-        <label>Espace de travail<select value={workspaceId} disabled={saving} onChange={(event) => { setWorkspaceId(event.target.value); setDetail(null); }}>
+        <label>Espace de travail<select value={workspaceId} disabled={saving} onChange={(event) => { setLoading(true); setWorkspaceId(event.target.value); setDetail(null); }}>
           {session.workspaces.map((workspace) => <option key={workspace.workspace_id} value={workspace.workspace_id}>{workspace.workspace_name}</option>)}
         </select></label>
-        {projects.length > 0 && <label>Chantier<select value={projectId} disabled={saving} onChange={(event) => setProjectId(event.target.value)}>
+        {projects.length > 0 && <label>Chantier<select value={projectId} disabled={saving} onChange={(event) => { setDetail(null); setProjectId(event.target.value); }}>
           {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
         </select></label>}
       </div> : session?.projects.length ? <p>Projets auxquels ce compte a acc�s :</p> : <p>Aucun espace ou chantier n'est associ� � ce compte.</p>}
-      {!session?.workspaces.length && projects.length > 0 && <label>Chantier<select value={projectId} disabled={saving} onChange={(event) => setProjectId(event.target.value)}>
+      {!session?.workspaces.length && projects.length > 0 && <label>Chantier<select value={projectId} disabled={saving} onChange={(event) => { setDetail(null); setProjectId(event.target.value); }}>
         {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
       </select></label>}
 
