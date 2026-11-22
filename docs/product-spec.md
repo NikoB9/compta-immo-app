@@ -40,6 +40,8 @@ A modular, self-hosted PWA for French real-estate owners to track properties, ap
 - Support an optional user-selected signature appearance (drawn, typed or uploaded) per signer. That image is visual only, not proof by itself.
 - Signature evidence must bind signer's verified identity and consent, document digest, version, timestamp, and event log; use a specialist signature provider after legal review of the required level.
 
+Implementation status: mandate drafts, party-specific signing tied to verified Cloudflare Access email, first-signature content lock, digest and event logging are available. The current generic form has fields for purchase limits, authorized materials, terms, and validity dates. It prints through the browser and can include an owner-uploaded signature image. It does not yet reproduce the supplied template exactly, generate a PDF artifact in the application, provide individual image selection for every signer, or establish legal sufficiency. Keep this path under review until the actual template, output artifact, and required signature assurance are agreed and checked.
+
 ## Authentication and authorization
 
 - Site entry is restricted by Cloudflare Access using Google identity and/or email OTP. Verify the Access JWT server-side.
