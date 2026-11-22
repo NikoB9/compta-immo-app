@@ -40,9 +40,10 @@
 
 - Private invoice/justificatif upload and preview use the operator-mounted PRIVATE_DOCUMENTS_DIR, never PostgreSQL or Git for file bytes. Uploads are capped at 25 MiB and limited by signature to PDF/JPEG/PNG/WebP; preview revalidates authorization and SHA-256. Annual ledger rows list linked files and allow upload/open-preview. This is not malware scanning.
 
-- Project UI/API now creates projects by address, adds project invoices with manual supplier/date/number/total fields and uploaded documents, records advances/payments/reimbursements/refunds/returns, and shows the two-way debours reconciliation. Existing project guests can read assigned-project data; all mutation routes enforce owner access. Invoice/payment amounts stay marked for review; OCR is not implemented.
+- Project UI/API now creates projects by address, adds project invoices with supplier/date/number/total fields and uploaded documents, records advances/payments/reimbursements/refunds/returns, and shows the two-way debours reconciliation. Existing project guests can read assigned-project data; all mutation routes enforce owner access. Invoice/payment amounts stay marked for review.
 - Planned invoice extraction explicitly includes every detected product/service line, editable source-traceable fields, and permission-scoped filtering/search by invoice and line-item amount/text.
-- Added PostgreSQL storage for OCR runs and product/service lines with source page, confidence, review state, tax amount/rate fields, workspace RLS, guest project read policy, and runtime grants. The project invoice API returns these rows; the chantier UI displays them and filters invoices by supplier/reference/product text and by invoice or line amount. OCR execution and editing/confirmation controls remain unimplemented.
+- Added local invoice extraction with PDF.js: every PDF page is checked for readable native text first; only pages without usable text are rendered to a bounded canvas for local Tesseract.js OCR. OCR worker, French model, PDF worker, and WASM assets are copied from pinned packages at build/dev startup and served from the same origin. Invoice metadata and candidate line amounts remain suggestions that require review. Each line shows its source and OCR confidence when available, and can be edited, confirmed, or excluded. Private APIs store extracted and reviewed fields, source text, page provenance, and review state; reruns cannot replace confirmed rows.
+- Added PostgreSQL storage for OCR runs and product/service lines with source page, confidence, review state, tax amount/rate fields, workspace RLS, guest project read policy, and runtime grants. The project invoice API returns these rows; the chantier UI displays them and filters invoices by supplier/reference/product text and by invoice or line amount. Server-side indexed line search remains a follow-up.
 - Added an in-app fiscal guardrail note and linked official tax sources. It distinguishes the VAT definition of débours from French property-income expense deductibility and flags pre-letting work for human review; it makes no tax qualification. Supporting source notes are in docs/tax-guardrails.md.
 
 ## Verification status (updated 2026-11-22)
@@ -63,12 +64,11 @@
 
 ## Next tasks
 
-1. Implement local invoice OCR for invoice metadata and every product/service line, then add correction/confirmation controls and source provenance.
-2. Configure Cloudflare Access, bootstrap the owner workspace/address/units, provision invited guests, implement invitation acceptance and verify owner/guest flows.
-3. Implement local invoice OCR for supplier/date/reference/totals and all product/service lines, with a correction table, per-field confidence/source-page trace, and no silent calculation or tax classification. Add per-field editing/confirmation and server-side indexed search/filter over invoices and lines, scoped by project/property permissions.
-4. Implement project invitations and acceptance, payment evidence lifecycle, mandate generation/signing, ZIP export bundles, provider sync, and Proxmox deployment.
-5. Add malware scanning, backups, retention, accessible component verification, and a live PostgreSQL/private-volume smoke run before production use.
-6. Run invitation, signing, provider-sync, backup/restore, and private-volume checks as those slices are implemented; keep production deployment blocked until these operational controls are complete.
+1. Configure Cloudflare Access, bootstrap the owner workspace/address/units, provision invited guests, implement invitation acceptance, and verify owner/guest flows.
+2. Add server-side indexed search/filter over invoices and lines, scoped by project/property permissions.
+3. Implement project invitations and acceptance, payment evidence lifecycle, mandate generation/signing, ZIP export bundles, provider sync, and Proxmox deployment.
+4. Add malware scanning, backups, retention, accessibility verification, and a live PostgreSQL/private-volume smoke run before production use.
+5. Run invitation, signing, provider-sync, backup/restore, and private-volume checks as those slices are implemented; keep production deployment blocked until these operational controls are complete.
 
 ## Key files
 
