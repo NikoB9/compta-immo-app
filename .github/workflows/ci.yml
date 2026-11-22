@@ -21,7 +21,7 @@ jobs:
         env:
           POSTGRES_DB: compta_test
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_PASSWORD: ${{ github.run_id }}
         ports:
           - 5432:5432
         options: >-
@@ -39,7 +39,7 @@ jobs:
           PGPORT: "5432"
           PGDATABASE: compta_test
           PGUSER: postgres
-          PGPASSWORD: postgres
+          PGPASSWORD: ${{ github.run_id }}
         run: for migration in infra/postgres/migrations/*.sql; do psql -v ON_ERROR_STOP=1 -f "$migration"; done
 
       - name: Check row access policies
@@ -48,7 +48,7 @@ jobs:
           PGPORT: "5432"
           PGDATABASE: compta_test
           PGUSER: postgres
-          PGPASSWORD: postgres
+          PGPASSWORD: ${{ github.run_id }}
         run: psql -v ON_ERROR_STOP=1 -f infra/postgres/tests/rls_smoke.sql
 
   web:
