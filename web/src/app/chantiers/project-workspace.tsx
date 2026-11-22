@@ -91,7 +91,7 @@ export default function ProjectWorkspace() {
   }, []);
 
   useEffect(() => {
-    if (!workspaceId && !session?.projects.length) { setProjects([]); setProjectId(""); return; }
+    if (!workspaceId && !session?.projects.length) return;
     let active = true;
     setLoading(true);
     const projectsUrl = workspaceId ? `/api/projects?workspaceId=${encodeURIComponent(workspaceId)}` : "/api/projects";
@@ -106,7 +106,7 @@ export default function ProjectWorkspace() {
   }, [workspaceId, session]);
 
   useEffect(() => {
-    if (!projectId) { setDetail(null); return; }
+    if (!projectId) return;
     let active = true;
     jsonRequest(`/api/projects/${encodeURIComponent(projectId)}/debours`).then((result: Detail) => {
       if (active) { setDetail(result); setError(""); }
