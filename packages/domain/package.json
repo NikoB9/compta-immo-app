@@ -1,0 +1,5 @@
+{
+  "name": "@compta-immo/domain",
+  "private": true,
+  "type": "module"
+}

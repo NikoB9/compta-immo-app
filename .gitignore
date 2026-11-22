@@ -1,0 +1,40 @@
+# Runtime secrets and databases
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql.gz
+backups/
+uploads/
+storage/
+private-data/
+private-documents/
+signed-documents/
+signature-images/
+signing-evidence/
+exports/
+
+# Real accounting documents and data
+*.xlsx
+*.xls
+*.pdf
+*.jpg
+*.jpeg
+*.zip
+*.csv
+*.png
+*.webp
+*.heic
+
+# Build output
+node_modules/
+.next/
+dist/
+build/
+coverage/
+.DS_Store
+Thumbs.db
+.worktrees/

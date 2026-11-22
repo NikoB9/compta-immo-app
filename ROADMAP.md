@@ -16,4 +16,6 @@
 
 ## À compléter
 
-Réintégrer les autres étapes du plan d’origine dès que sa version détaillée sera disponible, sans supprimer les exigences consignées ci-dessus.
+Le plan d’origine est maintenant réintégré dans [`docs/superpowers/plans/2026-11-21-web-foundation.md`](docs/superpowers/plans/2026-11-21-web-foundation.md). Il couvre aussi le registre annuel, le modèle d’accès, les débours, les mandats/signatures, les intégrations de stockage, les contrôles fiscaux et le déploiement.
+
+L’OCR doit extraire toutes les lignes détectées (désignation, quantité, unité, prix unitaire, taux de taxe et total de ligne lorsque présents), garder les propositions modifiables avec leur provenance/confiance, puis permettre la recherche et le filtrage des factures et lignes par texte et montant. Aucune donnée absente ne doit être inventée; l’OCR ne confirme ni la facture ni son traitement fiscal.
