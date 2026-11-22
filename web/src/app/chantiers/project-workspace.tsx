@@ -413,6 +413,39 @@ export default function ProjectWorkspace() {
     finally { setSaving(false); }
   }
 
+  async function saveMovementEvidence(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedProject || !selectedProject.can_edit) return;
+    const data = new FormData(event.currentTarget);
+    const file = data.get("evidenceFile");
+    if (!(file instanceof File) || !file.size) { setError("Choisissez le justificatif à joindre."); return; }
+    setSaving(true); setError(""); setMessage("");
+    try {
+      const evidenceDocumentId = await uploadToProject(file);
+      await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/debours`, "PATCH", {
+        movementId: String(data.get("movementId")),
+        evidenceDocumentId,
+      });
+      setDetail(await jsonRequest(projectDetailUrl(selectedProject.id, invoiceSearch, invoiceMin, invoiceMax)));
+      setMessage("Justificatif associé au mouvement. L’ancien fichier reste conservé dans les documents du chantier.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Association du justificatif impossible."); }
+    finally { setSaving(false); }
+  }
+
+  async function removeMovementEvidence(movementId: string) {
+    if (!selectedProject || !selectedProject.can_edit) return;
+    setSaving(true); setError(""); setMessage("");
+    try {
+      await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/debours`, "PATCH", {
+        movementId,
+        evidenceDocumentId: null,
+      });
+      setDetail(await jsonRequest(projectDetailUrl(selectedProject.id, invoiceSearch, invoiceMin, invoiceMax)));
+      setMessage("Justificatif retiré du mouvement. Le fichier reste conservé dans les documents du chantier.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Retrait du justificatif impossible."); }
+    finally { setSaving(false); }
+  }
+
   async function signMandate(event: FormEvent<HTMLFormElement>, mandate: Mandate) {
     event.preventDefault();
     if (!selectedProject || !mandate.yourPartyRole) return;
@@ -630,7 +663,7 @@ export default function ProjectWorkspace() {
           <h2 id="movements-title">Mouvements ({detail.movements.length})</h2>
           {detail.movements.length ? <div className="ledger-table"><table><thead><tr><th>Date</th><th>Mouvement</th><th>Montant</th><th>Facture / justificatif</th><th>Note</th></tr></thead><tbody>{detail.movements.map((movement) => <tr key={movement.id}>
             <td>{movement.occurredOn}</td><td>{movementLabel(movement.movementType)}{movement.paidInCash ? " · liquide" : ""}</td><td>{formatEuroCents(movement.amountCents)}</td>
-            <td>{movement.invoiceId ? `${movement.supplierName ?? "Facture"}${movement.invoiceNumber ? ` · ${movement.invoiceNumber}` : ""}` : "Sans facture liée"}{movement.evidenceDocumentId && <> · <a href={`/api/documents/${encodeURIComponent(movement.evidenceDocumentId)}`} target="_blank" rel="noreferrer">Justificatif</a></>}{movement.invoiceDocumentId && <> · <a href={`/api/documents/${encodeURIComponent(movement.invoiceDocumentId)}`} target="_blank" rel="noreferrer">Facture</a></>}</td>
+            <td>{movement.invoiceId ? `${movement.supplierName ?? "Facture"}${movement.invoiceNumber ? ` · ${movement.invoiceNumber}` : ""}` : "Sans facture liée"}{movement.evidenceDocumentId && <> · <a href={`/api/documents/${encodeURIComponent(movement.evidenceDocumentId)}`} target="_blank" rel="noreferrer">Justificatif</a></>}{movement.invoiceDocumentId && <> · <a href={`/api/documents/${encodeURIComponent(movement.invoiceDocumentId)}`} target="_blank" rel="noreferrer">Facture</a></>}{selectedProject.can_edit && !movement.paidInCash && <div className="ledger-bar"><form onSubmit={(event) => void saveMovementEvidence(event)}><input type="hidden" name="movementId" value={movement.id} /><label>{movement.evidenceDocumentId ? "Remplacer le justificatif" : "Ajouter un justificatif"}<input name="evidenceFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" required /></label><button disabled={saving}>{saving ? "Enregistrement…" : "Joindre"}</button></form>{movement.evidenceDocumentId && <button type="button" disabled={saving} onClick={() => void removeMovementEvidence(movement.id)}>Retirer</button>}</div>}</td>
             <td>{movement.note || "—"}</td>
           </tr>)}</tbody></table></div> : <p>Aucun mouvement enregistré pour ce chantier.</p>}
         </section>

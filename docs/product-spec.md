@@ -34,6 +34,8 @@ A modular, self-hosted PWA for French real-estate owners to track properties, ap
 - Track an internal-only amount separately from tax/export amounts. Internal-only entries remain in project budgets and are excluded from designated administrative/tax exports. This flag is not a legal tax classification.
 - Project exports are ZIPs containing an index, mandate, invoice/advance/reimbursement table and available evidence.
 
+Current implementation: owners can add, replace or detach a movement's payment evidence after entry. Each change is recorded in the audit log; previously attached documents remain preserved in project storage. Guests have read-only access.
+
 Current implementation: the authenticated project ZIP includes a JSON index, French semicolon-separated invoice/movement register, mandate and signature metadata, and integrity-checked evidence. It is limited to 100 documents and 100 MiB per archive.
 
 ## Mandates and signatures

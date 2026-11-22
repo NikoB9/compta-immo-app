@@ -274,6 +274,57 @@ export async function POST(request: Request, { params }: RouteContext) {
   }
 }
 
+export async function PATCH(request: Request, { params }: RouteContext) {
+  try {
+    const { projectId } = await params;
+    if (!isUuid(projectId)) throw new LedgerRequestError("Chantier introuvable.", 404);
+    const body = await readJson(request);
+    if (!isUuid(body.movementId)) throw new LedgerRequestError("Mouvement introuvable.", 404);
+    if (!Object.hasOwn(body, "evidenceDocumentId")) throw new LedgerRequestError("Indiquez le nouveau justificatif ou null pour le retirer.", 422);
+    const evidenceDocumentId = body.evidenceDocumentId === null || body.evidenceDocumentId === "" ? null : body.evidenceDocumentId;
+    if (evidenceDocumentId !== null && !isUuid(evidenceDocumentId)) throw new LedgerRequestError("Référence de justificatif invalide.", 422);
+
+    const result = await withAuthenticatedActor(request, async (client, _identity, actorId) => {
+      const project = await client.query<{ workspace_id: string }>(
+        "SELECT workspace_id FROM app.construction_project WHERE id = $1", [projectId],
+      );
+      if (!project.rows[0]) throw new LedgerRequestError("Chantier introuvable.", 404);
+      const workspaceId = await requireOwnedWorkspace(client, project.rows[0].workspace_id);
+      const current = await client.query<{ id: string; evidence_document_id: string | null; paid_in_cash: boolean }>(
+        `SELECT id, evidence_document_id, paid_in_cash FROM app.project_movement
+         WHERE workspace_id = $1 AND project_id = $2 AND id = $3 FOR UPDATE`,
+        [workspaceId, projectId, body.movementId],
+      );
+      const movement = current.rows[0];
+      if (!movement) throw new LedgerRequestError("Mouvement introuvable dans ce chantier.", 404);
+      if (movement.paid_in_cash && evidenceDocumentId) throw new LedgerRequestError("Un paiement liquide ne peut pas recevoir une preuve de virement.", 422);
+      if (evidenceDocumentId) {
+        const document = await client.query(
+          `SELECT 1 FROM app.stored_document sd
+           JOIN app.project_document pd ON pd.workspace_id = sd.workspace_id AND pd.document_id = sd.id
+           WHERE sd.workspace_id = $1 AND sd.id = $2 AND pd.project_id = $3`,
+          [workspaceId, evidenceDocumentId, projectId],
+        );
+        if (!document.rows.length) throw new LedgerRequestError("Le justificatif doit être un document de ce chantier.", 404);
+      }
+      if (movement.evidence_document_id === evidenceDocumentId) return { id: movement.id, evidenceDocumentId, changed: false };
+      await client.query(
+        `UPDATE app.project_movement SET evidence_document_id = $1
+         WHERE workspace_id = $2 AND project_id = $3 AND id = $4`,
+        [evidenceDocumentId, workspaceId, projectId, movement.id],
+      );
+      await appendAuditEvent(client, workspaceId, actorId, "project_movement_evidence_changed", movement.id, {
+        previousDocumentId: movement.evidence_document_id,
+        documentId: evidenceDocumentId,
+      }, "project_movement");
+      return { id: movement.id, evidenceDocumentId, changed: true };
+    });
+    return json(result);
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
 function amounts(rows: Array<{ movementType: MovementType; amountCents: number }>, type: MovementType) {
   return rows.filter((row) => row.movementType === type).map(({ amountCents }) => ({ amountCents }));
 }
