@@ -18,6 +18,7 @@ type Movement = {
   evidenceDocumentId: string | null; paidInCash: boolean; note: string | null; supplierName: string | null;
   invoiceNumber: string | null; invoiceTotalCents: number | null; invoiceDocumentId: string | null;
 };
+type ProjectInvitation = { id: string; email: string; expiresAt: string; acceptedAt: string | null; createdAt: string; userId: string | null };
 type Detail = {
   project: Project;
   invoices: Invoice[];
@@ -87,6 +88,10 @@ export default function ProjectWorkspace() {
   const [ocrProgress, setOcrProgress] = useState("");
   const [ocrBusy, setOcrBusy] = useState(false);
   const [invoiceFields, setInvoiceFields] = useState({ supplier: "", invoiceNumber: "", invoiceDate: "", total: "" });
+  const [projectInvitations, setProjectInvitations] = useState<ProjectInvitation[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [createdInvitationUrl, setCreatedInvitationUrl] = useState("");
+  const [createdInvitationEmail, setCreatedInvitationEmail] = useState("");
   const workspaceBuildings = session?.buildings.filter((building) => building.workspace_id === workspaceId) ?? [];
   const selectedProject = projects.find((project) => project.id === projectId);
   const visibleInvoices = detail?.invoices ?? [];
@@ -129,6 +134,17 @@ export default function ProjectWorkspace() {
     }, 250);
     return () => { active = false; clearTimeout(timer); };
   }, [projectId, invoiceSearch, invoiceMin, invoiceMax]);
+
+  useEffect(() => {
+    if (!projectId || !selectedProject?.can_edit) { setProjectInvitations([]); return; }
+    let active = true;
+    jsonRequest(`/api/projects/${encodeURIComponent(projectId)}/invitations`).then((result: { invitations: ProjectInvitation[] }) => {
+      if (active) setProjectInvitations(result.invitations);
+    }).catch((cause: unknown) => {
+      if (active) setError(cause instanceof Error ? cause.message : "Invitations indisponibles.");
+    });
+    return () => { active = false; };
+  }, [projectId, selectedProject?.can_edit]);
 
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -290,6 +306,55 @@ export default function ProjectWorkspace() {
     finally { setSaving(false); }
   }
 
+  async function inviteToProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedProject) return;
+    setSaving(true); setError(""); setMessage(""); setCreatedInvitationUrl("");
+    try {
+      const result = await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/invitations`, "POST", { email: inviteEmail }) as {
+        id: string; email: string; expiresAt: string; invitationUrl: string;
+      };
+      setProjectInvitations((current) => [{ id: result.id, email: result.email, expiresAt: result.expiresAt, acceptedAt: null, createdAt: new Date().toISOString(), userId: null }, ...current]);
+      setCreatedInvitationUrl(result.invitationUrl);
+      setCreatedInvitationEmail(result.email);
+      setInviteEmail("");
+      setMessage("Invitation créée. Transmettez le lien uniquement à l’adresse invitée.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Création de l’invitation impossible."); }
+    finally { setSaving(false); }
+  }
+
+  async function revokeProjectInvitation(invitationId: string) {
+    if (!selectedProject) return;
+    setSaving(true); setError(""); setMessage("");
+    try {
+      await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/invitations/${encodeURIComponent(invitationId)}`, "DELETE");
+      setProjectInvitations((current) => current.filter((invitation) => invitation.id !== invitationId));
+      setMessage("Invitation en attente révoquée.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Révocation impossible."); }
+    finally { setSaving(false); }
+  }
+
+  async function revokeProjectMember(userId: string) {
+    if (!selectedProject) return;
+    setSaving(true); setError(""); setMessage("");
+    try {
+      await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/members/${encodeURIComponent(userId)}`, "DELETE");
+      setProjectInvitations((current) => current.map((invitation) => invitation.userId === userId ? { ...invitation, userId: null } : invitation));
+      setMessage("Accès retiré de ce chantier.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Retrait de l'accès impossible."); }
+    finally { setSaving(false); }
+  }
+
+  async function copyInvitationLink() {
+    if (!createdInvitationUrl) return;
+    try {
+      await navigator.clipboard.writeText(createdInvitationUrl);
+      setMessage("Lien copié.");
+    } catch {
+      setError("Copie impossible. Sélectionnez le lien et copiez-le manuellement.");
+    }
+  }
+
   if (loading && !session) return <p role="status">Chargement des chantiers.</p>;
   return (
     <>
@@ -328,6 +393,25 @@ export default function ProjectWorkspace() {
           </div>
           {!selectedProject.can_edit && <p role="note">Accès invité en lecture seule.</p>}
         </section>
+
+        {selectedProject.can_edit && <section className="ledger-panel" aria-labelledby="project-invitations-title">
+          <h2 id="project-invitations-title">Accès invités à ce chantier</h2>
+          <form className="ledger-bar" onSubmit={inviteToProject}>
+            <label>Adresse e-mail<input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} required maxLength={320} /></label>
+            <button disabled={saving || !inviteEmail.trim()}>{saving ? "Création…" : "Créer une invitation"}</button>
+          </form>
+          <p role="note">L’adresse doit aussi être autorisée dans la politique Cloudflare Access du site. L’invité ne verra que ce chantier et y disposera d’un accès en lecture seule.</p>
+          {createdInvitationUrl && <div className="ledger-bar">
+            <label>Lien à transmettre<input readOnly value={createdInvitationUrl} onFocus={(event) => event.currentTarget.select()} /></label>
+            <button type="button" onClick={() => void copyInvitationLink()}>Copier le lien</button>
+            <a href={`mailto:${encodeURIComponent(createdInvitationEmail)}?subject=${encodeURIComponent(`Invitation au chantier ${selectedProject.name}`)}&body=${encodeURIComponent(`Acceptez l'invitation avec ce lien : ${createdInvitationUrl}`)}`}>Préparer un e-mail</a>
+          </div>}
+          {projectInvitations.length ? <ul>{projectInvitations.map((invitation) => <li key={invitation.id}>
+            {invitation.email} — {invitation.acceptedAt ? invitation.userId ? "Acceptée" : "Accès retiré" : new Date(invitation.expiresAt) <= new Date() ? "Expirée" : "En attente"}
+            {!invitation.acceptedAt && <button type="button" disabled={saving} onClick={() => void revokeProjectInvitation(invitation.id)}>Révoquer</button>}
+            {invitation.acceptedAt && invitation.userId && <button type="button" disabled={saving} onClick={() => void revokeProjectMember(invitation.userId!)}>Retirer l'accès</button>}
+          </li>)}</ul> : <p>Aucune invitation créée pour ce chantier.</p>}
+        </section>}
 
         <details className="ledger-panel">
           <summary>Repères fiscaux officiels — chaque facture reste à qualifier</summary>

@@ -44,6 +44,7 @@
 - Planned invoice extraction explicitly includes every detected product/service line, editable source-traceable fields, and permission-scoped filtering/search by invoice and line-item amount/text.
 - Added local invoice extraction with PDF.js: every PDF page is checked for readable native text first; only pages without usable text are rendered to a bounded canvas for local Tesseract.js OCR. OCR worker, French model, PDF worker, and WASM assets are copied from pinned packages at build/dev startup and served from the same origin. Invoice metadata and candidate line amounts remain suggestions that require review. Each line shows its source and OCR confidence when available, and can be edited, confirmed, or excluded. Private APIs store extracted and reviewed fields, source text, page provenance, and review state; reruns cannot replace confirmed rows.
 - Added PostgreSQL storage for OCR runs and product/service lines with source page, confidence, review state, tax amount/rate fields, workspace RLS, guest project read policy, and runtime grants. The project invoice API returns these rows; the chantier UI displays them and searches by French full-text supplier/reference/product terms and invoice or line amount through PostgreSQL GIN/B-tree indexes. Search results are project-scoped, while the debours reconciliation continues to use every project invoice regardless of the active filter.
+- Added owner-only project invitations with a one-time 256-bit token stored only as a SHA-256 hash, seven-day expiry, verified-Cloudflare-email matching, guest account provisioning on acceptance, project membership insertion, invitation revocation, guest access removal, and audit events. Owners can copy a link or open a prefilled mail draft. The secret is passed in the link fragment, not the server URL. The link uses configured `APP_BASE_URL` (local development can use its local origin).
 - Added an in-app fiscal guardrail note and linked official tax sources. It distinguishes the VAT definition of débours from French property-income expense deductibility and flags pre-letting work for human review; it makes no tax qualification. Supporting source notes are in docs/tax-guardrails.md.
 
 ## Verification status (updated 2026-11-22)
@@ -64,11 +65,10 @@
 
 ## Next tasks
 
-1. Configure Cloudflare Access, bootstrap the owner workspace/address/units, provision invited guests, implement invitation acceptance, and verify owner/guest flows.
-2. Configure Cloudflare Access, bootstrap the owner workspace/address/units, provision invited guests, implement invitation acceptance, and verify owner/guest flows.
-3. Implement project invitations and acceptance, payment evidence lifecycle, mandate generation/signing, ZIP export bundles, provider sync, and Proxmox deployment.
-4. Add malware scanning, backups, retention, accessibility verification, and a live PostgreSQL/private-volume smoke run before production use.
-5. Run invitation, signing, provider-sync, backup/restore, and private-volume checks as those slices are implemented; keep production deployment blocked until these operational controls are complete.
+1. Configure Cloudflare Access to restrict site entry to the owner and invited emails, bootstrap the owner workspace/address/units, and verify owner/guest isolation. The app creates and validates invitations; adding each invited email to the Cloudflare Access allow policy still requires deployment configuration.
+2. Implement payment-evidence lifecycle, mandate generation/signing, ZIP export bundles, provider sync, and Proxmox deployment.
+3. Add malware scanning, backups, retention, accessibility verification, and a live PostgreSQL/private-volume smoke run before production use.
+4. Run invitation, signing, provider-sync, backup/restore, and private-volume checks as those slices are implemented; keep production deployment blocked until these operational controls are complete.
 
 ## Key files
 

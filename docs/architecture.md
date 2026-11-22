@@ -28,7 +28,7 @@ Run `infra/postgres/ops/grant_runtime_session_access.sql` as the database owner,
 
 ## Not yet implemented
 
-- Invitation acceptance and project guest provisioning (owner bootstrap currently requires a one-time operator run). Project reads are scoped for existing members; movement writes remain owner-only.
+- Cloudflare Access policy setup and the initial owner workspace/address/unit bootstrap remain operator configuration. Project invitation issuance, verified-email acceptance, guest provisioning, and project-scoped membership are implemented; adding each invited email to the Cloudflare Access allow policy still requires deployment configuration. Project reads are scoped for members; movement writes remain owner-only.
 - Workspace creation, invitation acceptance, and server-side row error reporting with line numbers. The current UI previews CSV rows locally; the server reparses and commits the full file atomically. The CI role uses broader grants solely to exercise row-level policies.
 - Malware scanning, retention rules, and safe handling of untrusted uploads. Authenticated owner-only ledger upload and preview now exist but are not production-ready without the remaining controls described below.
 - Import and reconciliation of the existing workbook, formal tax review, and tax-form validation. CSV backup/export and atomic CSV import are implemented in the current register.
@@ -57,6 +57,8 @@ Invoice search is executed on the server within the selected project. French ful
 ## Project debours
 
 The owner can create a project for a building address, record advances, supplier payments, reimbursements, supplier refunds, and returns, and see the two-way outstanding balance plus amounts awaiting invoice support. Project invoices are added with extracted or manually entered supplier, optional number/date, total, and an uploaded file, then remain marked for review. Linked invoice payments are capped at the invoice total while holding the invoice row lock. A project guest can read assigned-project movements and documents, but cannot write. These calculations are operational reconciliation only; they do not determine deductibility or tax treatment.
+
+Project owners can create a seven-day invitation for a specific email. The bearer token is 256 random bits, stored only as a SHA-256 hash, single-use, and accepted only when the verified Cloudflare Access email matches the invited email. Acceptance provisions an active guest account when one does not exist and adds membership to that project only. Owners can revoke a pending invitation or remove an accepted guest from that project. The app provides a copyable link and a prefilled `mailto:` draft, but does not send email itself. The owner must also add invited emails to the Cloudflare Access policy, which is not provisioned automatically by the application.
 
 
 Fiscal product guardrails and official sources are documented in [docs/tax-guardrails.md](tax-guardrails.md). The project screen distinguishes VAT “débours” conditions from rental-income deductibility and makes no automatic tax determination. Pre-letting work must be reviewed against the current official guidance; no invoice in this application is automatically treated as deductible.

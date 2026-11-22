@@ -10,3 +10,4 @@ GRANT EXECUTE ON FUNCTION app_private.resolve_user_id_for_email(text) TO app_run
 GRANT EXECUTE ON FUNCTION app_private.owns_workspace(uuid) TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.is_project_member(uuid) TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.can_read_document(uuid) TO app_runtime;
+GRANT EXECUTE ON FUNCTION app_private.accept_project_invitation(text, text) TO app_runtime;
