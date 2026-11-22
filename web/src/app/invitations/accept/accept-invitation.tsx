@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+
+function subscribeToInvitationHash(onChange: () => void) {
+  window.addEventListener("hashchange", onChange);
+  return () => window.removeEventListener("hashchange", onChange);
+}
+
+function getInvitationToken() {
+  return new URLSearchParams(window.location.hash.slice(1)).get("token") ?? "";
+}
 
 export default function AcceptInvitation() {
   const router = useRouter();
-  const [token, setToken] = useState("");
+  const token = useSyncExternalStore(subscribeToInvitationHash, getInvitationToken, () => "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.slice(1));
-    setToken(params.get("token") ?? "");
-  }, []);
 
   async function accept() {
     setBusy(true);
@@ -36,7 +40,7 @@ export default function AcceptInvitation() {
   return (
     <section className="ledger-panel">
       {error && <p role="alert" className="ledger-error">{error}</p>}
-      {!token && <p role="alert">Le lien d'invitation ne contient pas de jeton valide.</p>}
+      {!token && <p role="alert">Le lien d&apos;invitation ne contient pas de jeton valide.</p>}
       <button type="button" onClick={() => void accept()} disabled={busy || !token}>
         {busy ? "Acceptation…" : "Accepter l'invitation"}
       </button>

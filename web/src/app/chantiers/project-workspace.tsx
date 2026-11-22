@@ -136,7 +136,7 @@ export default function ProjectWorkspace() {
   }, [projectId, invoiceSearch, invoiceMin, invoiceMax]);
 
   useEffect(() => {
-    if (!projectId || !selectedProject?.can_edit) { setProjectInvitations([]); return; }
+    if (!projectId || !selectedProject?.can_edit) return;
     let active = true;
     jsonRequest(`/api/projects/${encodeURIComponent(projectId)}/invitations`).then((result: { invitations: ProjectInvitation[] }) => {
       if (active) setProjectInvitations(result.invitations);
@@ -409,7 +409,7 @@ export default function ProjectWorkspace() {
           {projectInvitations.length ? <ul>{projectInvitations.map((invitation) => <li key={invitation.id}>
             {invitation.email} — {invitation.acceptedAt ? invitation.userId ? "Acceptée" : "Accès retiré" : new Date(invitation.expiresAt) <= new Date() ? "Expirée" : "En attente"}
             {!invitation.acceptedAt && <button type="button" disabled={saving} onClick={() => void revokeProjectInvitation(invitation.id)}>Révoquer</button>}
-            {invitation.acceptedAt && invitation.userId && <button type="button" disabled={saving} onClick={() => void revokeProjectMember(invitation.userId!)}>Retirer l'accès</button>}
+            {invitation.acceptedAt && invitation.userId && <button type="button" disabled={saving} onClick={() => void revokeProjectMember(invitation.userId!)}>Retirer l&apos;accès</button>}
           </li>)}</ul> : <p>Aucune invitation créée pour ce chantier.</p>}
         </section>}
 
