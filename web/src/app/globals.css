@@ -98,8 +98,12 @@ h2 { margin: 0; font-size: 25px; line-height: 1.2; letter-spacing: -.045em; font
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
 @media print {
   body * { visibility: hidden; }
-  .mandate-print, .mandate-print * { visibility: visible; }
-  .mandate-print { position: relative; break-inside: avoid; border: 0; }
-  .mandate-print > summary, .mandate-print > form, .mandate-print > button { display: none; }
-  .mandate-print article { position: absolute; inset: 0 auto auto 0; width: 100%; }
+  .mandate-print:not([data-print-selected="true"]) { display: none; }
+  .mandate-print[data-print-selected="true"], .mandate-print[data-print-selected="true"] * { visibility: visible; }
+  .mandate-print[data-print-selected="true"] { position: static; display: block; border: 0; }
+  .mandate-print[data-print-selected="true"] > summary,
+  .mandate-print[data-print-selected="true"] > form,
+  .mandate-print[data-print-selected="true"] > button { display: none; }
+  .mandate-print[data-print-selected="true"] article { position: static; width: 100%; }
+  .mandate-signature-image { display: block; width: auto; max-width: 12rem; max-height: 5rem; object-fit: contain; }
 }

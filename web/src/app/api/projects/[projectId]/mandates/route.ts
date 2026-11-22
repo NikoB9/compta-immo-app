@@ -85,6 +85,9 @@ export function validateMandateData(value: unknown) {
     || !isText(data.terms, 1, 3000) || !isDate(data.effectiveOn) || !isDate(data.expiresOn)) {
     throw new LedgerRequestError("Le plafond, les matériaux, les conditions ou les dates du mandat sont invalides.", 422);
   }
+  if (String(data.expiresOn) < String(data.effectiveOn)) {
+    throw new LedgerRequestError("La fin de validité doit être postérieure au début du mandat.", 422);
+  }
   return {
     version: 1,
     parties: Object.fromEntries(["mandant", "mandataire"].map((role) => {
@@ -109,7 +112,11 @@ function stableStringify(value: unknown): string {
 }
 function isText(value: unknown, min: number, max: number): value is string { return typeof value === "string" && value.trim().length >= min && value.length <= max && !value.includes("\0"); }
 function isEmail(value: unknown) { return isText(value, 3, 320) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
-function isDate(value: unknown) { return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)); }
+function isDate(value: unknown) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
 async function readJson(request: Request) {
   const text = await readUtf8Body(request, MAX_BODY_BYTES);
   try { const value: unknown = JSON.parse(text); if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(); return value as Record<string, unknown>; }

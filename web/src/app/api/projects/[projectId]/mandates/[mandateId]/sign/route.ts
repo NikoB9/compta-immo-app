@@ -24,13 +24,18 @@ export async function POST(request: Request, { params }: RouteContext) {
     const result = await withAuthenticatedActor(request, async (client, identity, actorId) => {
       const query = await client.query<{
         id: string; workspace_id: string; project_id: string; title: string; content_sha256: string;
-        mandate_data: { parties?: Record<string, { email?: string; name?: string }> };
+        mandate_data: { parties?: Record<string, { email?: string; name?: string }>; effectiveOn?: string; expiresOn?: string };
       }>(
         `SELECT id, workspace_id, project_id, title, content_sha256, mandate_data
          FROM app.project_mandate WHERE id = $1 AND project_id = $2`, [mandateId, projectId],
       );
       const mandate = query.rows[0];
       if (!mandate) throw new LedgerRequestError("Mandat introuvable.", 404);
+      const today = new Date().toISOString().slice(0, 10);
+      if (!mandate.mandate_data.effectiveOn || !mandate.mandate_data.expiresOn
+        || today < mandate.mandate_data.effectiveOn || today > mandate.mandate_data.expiresOn) {
+        throw new LedgerRequestError("Le mandat n’est pas dans sa période de validité.", 422);
+      }
       const party = mandate.mandate_data.parties?.[partyRole];
       if (!party?.email || party.email.toLowerCase() !== identity.email.toLowerCase()) {
         throw new RequestAuthorizationError("Le compte authentifié ne correspond pas à l’e-mail de cette partie.", 403);

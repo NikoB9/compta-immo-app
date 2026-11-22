@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import Image from "next/image";
 import { formatEuroCents, parseEuroToCents } from "../../../../packages/domain/src/money.js";
 import { extractInvoiceLocally, type InvoiceOcrResult } from "./invoice-ocr";
 
@@ -101,6 +102,7 @@ export default function ProjectWorkspace() {
   const [createdInvitationUrl, setCreatedInvitationUrl] = useState("");
   const [createdInvitationEmail, setCreatedInvitationEmail] = useState("");
   const [mandates, setMandates] = useState<Mandate[]>([]);
+  const [printingMandateId, setPrintingMandateId] = useState("");
   const workspaceBuildings = session?.buildings.filter((building) => building.workspace_id === workspaceId) ?? [];
   const selectedProject = projects.find((project) => project.id === projectId);
   const visibleInvoices = detail?.invoices ?? [];
@@ -165,6 +167,12 @@ export default function ProjectWorkspace() {
     });
     return () => { active = false; };
   }, [projectId]);
+
+  useEffect(() => {
+    const clearPrintSelection = () => setPrintingMandateId("");
+    window.addEventListener("afterprint", clearPrintSelection);
+    return () => window.removeEventListener("afterprint", clearPrintSelection);
+  }, []);
 
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -501,19 +509,19 @@ export default function ProjectWorkspace() {
               <label>Objet des travaux<input name="purpose" required maxLength={1000} /></label>
               <label>Plafond d’achat TTC (€)<input name="amountLimit" inputMode="decimal" required /></label>
               <label>Matériaux / achats autorisés (une ligne par poste)<textarea name="materials" rows={4} maxLength={12000} required /></label>
-              <label>Conditions du mandat<textarea name="terms" rows={5} maxLength={3000} defaultValue="Le mandataire agit au nom et pour le compte du mandant. Il remet les factures et justificatifs correspondant aux sommes avancées. Toute dépense hors du périmètre ou au-delà du plafond nécessite l’accord préalable du mandant." required /></label>
+              <label>Conditions du mandat<textarea name="terms" rows={7} maxLength={3000} defaultValue={"Le mandataire agit au nom et pour le compte du mandant et informe chaque fournisseur de cette qualité. Les factures d’achat sont établies au nom et à l’adresse du mandant ; une facture émise au nom du mandataire est exclue du présent décompte de débours.\n\nLe montant cumulé des achats ne peut dépasser le plafond TTC, frais inclus. Tout dépassement requiert l’accord écrit préalable du mandant.\n\nLe mandataire remet un décompte détaillé, les factures fournisseurs et les preuves de paiement. Seuls les montants effectivement réglés et justifiés sont remboursés, à l’euro près, sans marge, commission ni majoration. Les avances en attente de facture et les remboursements sont rapprochés séparément."} required /></label>
               <label>Début de validité<input name="effectiveOn" type="date" defaultValue={localToday()} required /></label>
               <label>Fin de validité<input name="expiresOn" type="date" required /></label>
               <button disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer le brouillon"}</button>
             </form>
             <p role="note">Le brouillon est verrouillé dès la première signature. Vérifiez les noms, e-mails, achats autorisés, plafond et conditions avant de le créer.</p>
           </details>}
-          {mandates.length ? mandates.map((mandate) => <details className="mandate-print" key={mandate.id}>
+          {mandates.length ? mandates.map((mandate) => <details className="mandate-print" data-print-selected={printingMandateId === mandate.id} key={mandate.id}>
             <summary>{mandate.title} · {mandate.signatures.length}/2 signatures</summary>
             <article>
               <h3>Mandat spécial de débours</h3>
-              <p><strong>Mandant :</strong> {mandate.mandateData.parties.mandant.name} — {mandate.mandateData.parties.mandant.address}</p>
-              <p><strong>Mandataire :</strong> {mandate.mandateData.parties.mandataire.name} — {mandate.mandateData.parties.mandataire.address}</p>
+              <p><strong>Mandant :</strong> {mandate.mandateData.parties.mandant.name} — {mandate.mandateData.parties.mandant.email} — {mandate.mandateData.parties.mandant.address}</p>
+              <p><strong>Mandataire :</strong> {mandate.mandateData.parties.mandataire.name} — {mandate.mandateData.parties.mandataire.email} — {mandate.mandateData.parties.mandataire.address}</p>
               <p><strong>Chantier :</strong> {mandate.mandateData.project.address}</p>
               <p><strong>Objet :</strong> {mandate.mandateData.project.purpose}</p>
               <p><strong>Plafond TTC :</strong> {formatEuroCents(mandate.mandateData.amountLimitCents)}</p>
@@ -524,11 +532,11 @@ export default function ProjectWorkspace() {
               <h4>Signatures électroniques</h4>
               {(["mandant", "mandataire"] as const).map((role) => {
                 const signature = mandate.signatures.find((item) => item.partyRole === role);
-                return <p key={role}><strong>{role} :</strong> {signature ? `${signature.signerName} (${signature.signerEmail}), le ${new Date(signature.signedAt).toLocaleString("fr-FR")}` : "En attente"}</p>;
+                return <div key={role}><p><strong>{role} :</strong> {signature ? `${signature.signerName} (${signature.signerEmail}), le ${new Date(signature.signedAt).toLocaleString("fr-FR")}` : "En attente"}</p>{signature?.signatureImageDocumentId && <Image className="mandate-signature-image" src={`/api/documents/${encodeURIComponent(signature.signatureImageDocumentId)}`} alt={`Image de signature de ${role}`} width={192} height={80} unoptimized />}</div>;
               })}
               <small>Empreinte du contenu signé (SHA-256) : {mandate.contentSha256}</small>
             </article>
-            <button type="button" onClick={() => window.print()}>Imprimer / enregistrer en PDF</button>
+            <button type="button" onClick={() => { setPrintingMandateId(mandate.id); window.setTimeout(() => window.print(), 100); }}>Imprimer / enregistrer en PDF</button>
             {mandate.yourPartyRole && !mandate.signatures.some((signature) => signature.partyRole === mandate.yourPartyRole) && <form className="ledger-bar" onSubmit={(event) => void signMandate(event, mandate)}>
               <label>Nom affiché pour la signature<input name="signerName" defaultValue={mandate.mandateData.parties[mandate.yourPartyRole].name} required maxLength={200} /></label>
               {selectedProject.can_edit && <label>Image facultative pour le rendu<input name="signatureImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>}
