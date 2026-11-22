@@ -69,6 +69,7 @@ export async function GET(request: Request, { params }: RouteContext) {
           lineTotalCents: string | null;
           sourcePage: number | null;
           confidence: string | null;
+          source: "native_pdf_text" | "local_ocr" | null;
           reviewStatus: "needs_review" | "confirmed" | "excluded";
         }>;
       }>(
@@ -82,6 +83,7 @@ export async function GET(request: Request, { params }: RouteContext) {
                     'taxRateBasisPoints', li.tax_rate_basis_points,
                     'taxAmountCents', li.tax_amount_cents::text, 'lineTotalCents', li.line_total_cents::text,
                     'sourcePage', li.source_page, 'confidence', li.confidence::text,
+                    'source', li.extracted_fields->>'source',
                     'reviewStatus', li.review_status
                   ) ORDER BY li.line_number)
                   FROM app.invoice_line_item li
@@ -177,7 +179,7 @@ export async function POST(request: Request, { params }: RouteContext) {
            WHERE workspace_id = $1 AND invoice_id = $2 AND project_id <> $3 LIMIT 1`,
           [workspaceId, movement.invoiceId, projectId],
         );
-        if (attachedElsewhere.rows.length) throw new LedgerRequestError("Cette facture est d�j� rattach�e � un autre chantier.", 409);
+        if (attachedElsewhere.rows.length) throw new LedgerRequestError("Cette facture est déjà rattachée à un autre chantier.", 409);
         const allocated = await client.query<{ total: string }>(
           `SELECT (
              COALESCE((SELECT SUM(amount_cents) FROM app.invoice_payment WHERE workspace_id = $1 AND invoice_id = $2), 0)
@@ -186,7 +188,7 @@ export async function POST(request: Request, { params }: RouteContext) {
           [workspaceId, movement.invoiceId],
         );
         if (BigInt(allocated.rows[0].total) + BigInt(movement.amountCents) > BigInt(invoice.rows[0].invoice_total_cents)) {
-          throw new LedgerRequestError("Le paiement d�passerait le total de la facture.", 409);
+          throw new LedgerRequestError("Le paiement dépasserait le total de la facture.", 409);
         }
       }
       if (movement.evidenceDocumentId) {
@@ -231,13 +233,13 @@ function parseMovement(body: Record<string, unknown>) {
     throw new LedgerRequestError("Date de mouvement invalide.", 422);
   }
   if (!Number.isSafeInteger(body.amountCents) || (body.amountCents as number) <= 0) {
-    throw new LedgerRequestError("Le montant doit �tre positif et en centimes entiers.", 422);
+    throw new LedgerRequestError("Le montant doit être positif et en centimes entiers.", 422);
   }
   const invoiceId = body.invoiceId == null || body.invoiceId === "" ? null : body.invoiceId;
-  if (invoiceId !== null && !isUuid(invoiceId)) throw new LedgerRequestError("R�f�rence de facture invalide.", 422);
-  if (invoiceId && type !== "supplier_payment") throw new LedgerRequestError("Seul un paiement fournisseur peut �tre reli� � une facture.", 422);
+  if (invoiceId !== null && !isUuid(invoiceId)) throw new LedgerRequestError("Référence de facture invalide.", 422);
+  if (invoiceId && type !== "supplier_payment") throw new LedgerRequestError("Seul un paiement fournisseur peut être relié à une facture.", 422);
   const evidenceDocumentId = body.evidenceDocumentId == null || body.evidenceDocumentId === "" ? null : body.evidenceDocumentId;
-  if (evidenceDocumentId !== null && !isUuid(evidenceDocumentId)) throw new LedgerRequestError("R�f�rence de justificatif invalide.", 422);
+  if (evidenceDocumentId !== null && !isUuid(evidenceDocumentId)) throw new LedgerRequestError("Référence de justificatif invalide.", 422);
   const paidInCash = body.paidInCash === true;
   if (body.paidInCash !== undefined && typeof body.paidInCash !== "boolean") throw new LedgerRequestError("Mode de paiement invalide.", 422);
   if (paidInCash && evidenceDocumentId) throw new LedgerRequestError("Un paiement liquide n'a pas de preuve de virement.", 422);
@@ -281,7 +283,7 @@ function errorResponse(error: unknown) {
   if (error instanceof LedgerRequestError) return json({ error: error.message }, error.status);
   if (error instanceof RequestAuthorizationError) return json({ error: error.message }, error.status);
   if (error instanceof AccessConfigurationError) return json({ error: "Authentication is not configured." }, 503);
-  if ((error as { code?: string } | null)?.code === "23503") return json({ error: "Les r�f�rences du mouvement sont invalides." }, 422);
+  if ((error as { code?: string } | null)?.code === "23503") return json({ error: "Les références du mouvement sont invalides." }, 422);
   console.error("Project debours request failed.");
-  return json({ error: "Le suivi des d�bours est indisponible." }, 503);
+  return json({ error: "Le suivi des débours est indisponible." }, 503);
 }

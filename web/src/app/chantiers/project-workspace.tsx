@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { formatEuroCents, parseEuroToCents } from "../../../../packages/domain/src/money.js";
+import { extractInvoiceLocally, type InvoiceOcrResult } from "./invoice-ocr";
 
 type Session = {
   workspaces: Array<{ workspace_id: string; workspace_name: string; role: "owner" | "administrator" }>;
@@ -10,7 +11,7 @@ type Session = {
   buildings: Array<{ workspace_id: string; building_id: string; building_label: string; address_line1: string; postal_code: string; locality: string }>;
 };
 type Project = { id: string; workspace_id: string; building_id: string; name: string; status: string; can_edit: boolean };
-type InvoiceLine = { id: string; lineNumber: number; description: string; quantity: string | null; unit: string | null; unitPriceCents: number | null; amountBasis: "before_tax" | "after_tax" | "unknown"; taxRateBasisPoints: number | null; taxAmountCents: number | null; lineTotalCents: number | null; sourcePage: number | null; confidence: string | null; reviewStatus: "needs_review" | "confirmed" | "excluded" };
+type InvoiceLine = { id: string; lineNumber: number; description: string; quantity: string | null; unit: string | null; unitPriceCents: number | null; amountBasis: "before_tax" | "after_tax" | "unknown"; taxRateBasisPoints: number | null; taxAmountCents: number | null; lineTotalCents: number | null; sourcePage: number | null; confidence: string | null; source: "native_pdf_text" | "local_ocr" | null; reviewStatus: "needs_review" | "confirmed" | "excluded" };
 type Invoice = { id: string; supplierName: string; invoiceNumber: string | null; invoiceDate: string | null; totalCents: number; documentId: string; extractionStatus: string; lineItems: InvoiceLine[] };
 type Movement = {
   id: string; movementType: string; occurredOn: string; amountCents: number; invoiceId: string | null;
@@ -41,6 +42,14 @@ function localToday() {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function centsInput(value: number | null) {
+  return value === null ? "" : `${Math.floor(value / 100)},${String(value % 100).padStart(2, "0")}`;
+}
+
+function optionalEuroInput(value: string) {
+  return value.trim() ? parseEuroToCents(value) : null;
+}
+
 function movementLabel(type: string) {
   return ({
     advance: "Avance vers le mandataire",
@@ -64,6 +73,10 @@ export default function ProjectWorkspace() {
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [invoiceMin, setInvoiceMin] = useState("");
   const [invoiceMax, setInvoiceMax] = useState("");
+  const [invoiceOcr, setInvoiceOcr] = useState<InvoiceOcrResult | null>(null);
+  const [ocrProgress, setOcrProgress] = useState("");
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [invoiceFields, setInvoiceFields] = useState({ supplier: "", invoiceNumber: "", invoiceDate: "", total: "" });
   const workspaceBuildings = session?.buildings.filter((building) => building.workspace_id === workspaceId) ?? [];
   const selectedProject = projects.find((project) => project.id === projectId);
   const visibleInvoices = (detail?.invoices ?? []).filter((invoice) => {
@@ -165,17 +178,83 @@ export default function ProjectWorkspace() {
     setSaving(true); setError(""); setMessage("");
     try {
       const documentId = await uploadToProject(file);
-      await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/invoices`, "POST", {
-        supplierName: String(data.get("supplier")),
-        invoiceNumber: String(data.get("invoiceNumber")),
-        invoiceDate: String(data.get("invoiceDate")),
+      const invoice = await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/invoices`, "POST", {
+        supplierName: invoiceFields.supplier,
+        invoiceNumber: invoiceFields.invoiceNumber,
+        invoiceDate: invoiceFields.invoiceDate,
         totalCents,
         documentId,
-      });
+      }) as { id: string };
+      if (invoiceOcr) {
+        await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/invoices/${encodeURIComponent(invoice.id)}/ocr`, "POST", {
+          recognizedText: invoiceOcr.recognizedText,
+          pageCount: invoiceOcr.pages.length,
+          lines: invoiceOcr.lines.slice(0, 200),
+          extractedFields: {
+            supplierName: invoiceOcr.supplierName,
+            invoiceNumber: invoiceOcr.invoiceNumber,
+            invoiceDate: invoiceOcr.invoiceDate,
+            totalCents: invoiceOcr.totalCents,
+          },
+          reviewedFields: {
+            supplierName: invoiceFields.supplier,
+            invoiceNumber: invoiceFields.invoiceNumber,
+            invoiceDate: invoiceFields.invoiceDate,
+            totalCents,
+          },
+        });
+      }
       setDetail(await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/debours`));
       form.reset();
-      setMessage("Facture enregistrée pour vérification. Le montant est saisi manuellement à ce stade.");
+      setInvoiceFields({ supplier: "", invoiceNumber: "", invoiceDate: "", total: "" });
+      setInvoiceOcr(null);
+      setMessage("Facture enregistree. Verifiez les donnees et les lignes proposees avant de les confirmer.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Enregistrement de la facture impossible."); }
+    finally { setSaving(false); }
+  }
+
+  async function readInvoiceFile(file: File | null) {
+    setInvoiceOcr(null);
+    if (!file) return;
+    setOcrBusy(true); setError(""); setMessage(""); setOcrProgress("Préparation de l’OCR local…");
+    try {
+      const result = await extractInvoiceLocally(file, setOcrProgress);
+      setInvoiceOcr(result);
+      setInvoiceFields((current) => ({
+        supplier: current.supplier || result.supplierName,
+        invoiceNumber: current.invoiceNumber || result.invoiceNumber,
+        invoiceDate: current.invoiceDate || result.invoiceDate,
+        total: current.total || (result.totalCents === null ? "" : `${Math.floor(result.totalCents / 100)},${String(result.totalCents % 100).padStart(2, "0")}`),
+      }));
+      setMessage(`OCR exécuté sur cet appareil. ${result.lines.length} ligne(s) produit/prestation détectée(s), à contrôler.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "L’OCR local n’a pas pu lire ce fichier.");
+    } finally { setOcrBusy(false); setOcrProgress(""); }
+  }
+
+  async function saveInvoiceLine(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedProject) return;
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const amountBasis = String(data.get("amountBasis"));
+    const status = String(data.get("reviewStatus"));
+    setSaving(true); setError(""); setMessage("");
+    try {
+      await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/invoices/${encodeURIComponent(String(data.get("invoiceId")))}/lines/${encodeURIComponent(String(data.get("lineId")))}`, "PATCH", {
+        description: String(data.get("description")),
+        quantity: String(data.get("quantity")) || null,
+        unit: String(data.get("unit")) || null,
+        unitPriceCents: optionalEuroInput(String(data.get("unitPrice"))),
+        amountBasis,
+        taxRateBasisPoints: String(data.get("taxRate")) === "" ? null : Math.round(Number(data.get("taxRate")) * 100),
+        taxAmountCents: optionalEuroInput(String(data.get("taxAmount"))),
+        lineTotalCents: optionalEuroInput(String(data.get("lineTotal"))),
+        reviewStatus: status,
+      });
+      setDetail(await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/debours`));
+      setMessage("Ligne mise à jour; le statut de revue est enregistré.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "La correction de la ligne a échoué."); }
     finally { setSaving(false); }
   }
 
@@ -262,14 +341,15 @@ export default function ProjectWorkspace() {
         {selectedProject.can_edit && <section className="ledger-panel" aria-labelledby="add-invoice-title">
           <h2 id="add-invoice-title">Ajouter une facture au chantier</h2>
           <form className="ledger-bar" onSubmit={createInvoice}>
-            <label>Fournisseur<input name="supplier" required maxLength={300} /></label>
-            <label>Numéro de facture<input name="invoiceNumber" maxLength={120} /></label>
-            <label>Date de facture<input name="invoiceDate" type="date" /></label>
-            <label>Total de la facture<input name="total" inputMode="decimal" required /></label>
-            <label>Fichier facture<input name="invoiceFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" required /></label>
-            <button disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer la facture"}</button>
+            <label>Fournisseur<input name="supplier" value={invoiceFields.supplier} onChange={(event) => setInvoiceFields((current) => ({ ...current, supplier: event.target.value }))} required maxLength={300} /></label>
+            <label>Numéro de facture<input name="invoiceNumber" value={invoiceFields.invoiceNumber} onChange={(event) => setInvoiceFields((current) => ({ ...current, invoiceNumber: event.target.value }))} maxLength={120} /></label>
+            <label>Date de facture<input name="invoiceDate" type="date" value={invoiceFields.invoiceDate} onChange={(event) => setInvoiceFields((current) => ({ ...current, invoiceDate: event.target.value }))} /></label>
+            <label>Total de la facture<input name="total" inputMode="decimal" value={invoiceFields.total} onChange={(event) => setInvoiceFields((current) => ({ ...current, total: event.target.value }))} required /></label>
+            <label>Fichier facture<input name="invoiceFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => { void readInvoiceFile(event.currentTarget.files?.[0] ?? null); }} required /></label>
+            <button disabled={saving || ocrBusy}>{saving ? "Enregistrement…" : ocrBusy ? "Lecture OCR en cours…" : "Enregistrer la facture"}</button>
           </form>
-          <p>Le montant est saisi et reste à vérifier. Aucune lecture automatique n&apos;est encore activée.</p>
+          {ocrProgress && <p role="status">{ocrProgress}</p>}
+          <p>OCR dans le navigateur. Contrôlez et corrigez les champs avant la sauvegarde; les valeurs reconnues restent à confirmer.</p>
         </section>}
 
         {selectedProject.can_edit && <section className="ledger-panel" aria-labelledby="add-movement-title">
@@ -301,13 +381,26 @@ export default function ProjectWorkspace() {
             <td>{invoice.supplierName}</td><td>{invoice.invoiceNumber || "-"}</td><td>{invoice.invoiceDate || "-"}</td><td>{formatEuroCents(invoice.totalCents)}</td>
             <td><a href={`/api/documents/${encodeURIComponent(invoice.documentId)}`} target="_blank" rel="noreferrer">Prévisualiser</a> · à vérifier</td>
             <td><details><summary>{invoice.lineItems.length} ligne(s)</summary>
-              {invoice.lineItems.length ? <div className="ledger-table"><table><thead><tr><th>Ligne</th><th>Désignation</th><th>Quantité</th><th>Prix unitaire</th><th>Total ligne</th><th>Base</th><th>Revue</th></tr></thead><tbody>{invoice.lineItems.map((line) => <tr key={line.id}>
+              {invoice.lineItems.length ? <div className="ledger-table"><table><thead><tr><th>Ligne</th><th>Désignation</th><th>Quantité</th><th>Prix unitaire</th><th>Total ligne</th><th>Base</th><th>Origine / confiance</th><th>Revue</th><th>Action</th></tr></thead><tbody>{invoice.lineItems.map((line) => <tr key={line.id}>
                 <td>{line.lineNumber}{line.sourcePage ? ` · p. ${line.sourcePage}` : ""}</td><td>{line.description}</td>
                 <td>{line.quantity ? `${line.quantity}${line.unit ? ` ${line.unit}` : ""}` : "-"}</td>
                 <td>{line.unitPriceCents === null ? "-" : formatEuroCents(line.unitPriceCents)}</td>
                 <td>{line.lineTotalCents === null ? "-" : formatEuroCents(line.lineTotalCents)}</td>
                 <td>{line.amountBasis === "before_tax" ? "HT" : line.amountBasis === "after_tax" ? "TTC" : "à préciser"}</td>
+                <td>{line.source === "native_pdf_text" ? "Texte PDF" : line.source === "local_ocr" ? "OCR local" : "Inconnu"}{line.confidence !== null ? ` · ${Math.round(Number(line.confidence) * 100)} %` : ""}</td>
                 <td>{line.reviewStatus === "confirmed" ? "Confirmée" : line.reviewStatus === "excluded" ? "Exclue" : "À vérifier"}</td>
+<td>{selectedProject.can_edit && <details><summary>Corriger</summary><form className="ledger-bar" onSubmit={saveInvoiceLine}>
+<input type="hidden" name="invoiceId" value={invoice.id} /><input type="hidden" name="lineId" value={line.id} />
+<label>Désignation<input name="description" defaultValue={line.description} required maxLength={500} /></label>
+<label>Quantité<input name="quantity" inputMode="decimal" defaultValue={line.quantity ?? ""} /></label>
+<label>Unité<input name="unit" defaultValue={line.unit ?? ""} maxLength={50} /></label>
+<label>Prix unitaire (€)<input name="unitPrice" inputMode="decimal" defaultValue={centsInput(line.unitPriceCents)} /></label>
+<label>Total ligne (€)<input name="lineTotal" inputMode="decimal" defaultValue={centsInput(line.lineTotalCents)} /></label>
+<label>Base<select name="amountBasis" defaultValue={line.amountBasis}><option value="unknown">À préciser</option><option value="before_tax">HT</option><option value="after_tax">TTC</option></select></label>
+<label>Taxe (%)<input name="taxRate" inputMode="decimal" defaultValue={line.taxRateBasisPoints === null ? "" : String(line.taxRateBasisPoints / 100)} /></label>
+<label>Montant taxe (€)<input name="taxAmount" inputMode="decimal" defaultValue={centsInput(line.taxAmountCents)} /></label>
+<label>Revue<select name="reviewStatus" defaultValue={line.reviewStatus}><option value="needs_review">À vérifier</option><option value="confirmed">Confirmer</option><option value="excluded">Exclure</option></select></label>
+<button disabled={saving}>Enregistrer</button></form></details>}</td>
               </tr>)}</tbody></table></div> : <p>Aucune ligne extraite pour le moment.</p>}
             </details></td>
           </tr>)}</tbody></table></div> : <p>{detail.invoices.length ? "Aucune facture ne correspond à ces filtres." : "Aucune facture enregistrée pour ce chantier."}</p>}

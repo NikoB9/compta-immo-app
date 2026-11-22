@@ -3,21 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "next dev",
+    "predev": "node scripts/copy-ocr-assets.mjs",
     "build": "next build",
+    "prebuild": "node scripts/copy-ocr-assets.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "node --test \"../packages/domain/test/*.test.js\""
   },
   "dependencies": {
+    "@tesseract.js-data/fra": "1.0.0",
     "jose": "^6.2.18",
     "next": "16.4.6",
+    "pdfjs-dist": "6.5.438",
     "pg": "^8.23.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",
