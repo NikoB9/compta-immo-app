@@ -19,6 +19,14 @@ type Movement = {
   invoiceNumber: string | null; invoiceTotalCents: number | null; invoiceDocumentId: string | null;
 };
 type ProjectInvitation = { id: string; email: string; expiresAt: string; acceptedAt: string | null; createdAt: string; userId: string | null };
+type Mandate = {
+  id: string; title: string; mandateData: {
+    parties: Record<"mandant" | "mandataire", { name: string; email: string; address: string }>;
+    project: { purpose: string; address: string }; amountLimitCents: number; authorizedMaterials: string[];
+    terms: string; effectiveOn: string; expiresOn: string;
+  }; contentSha256: string; yourPartyRole: "mandant" | "mandataire" | null;
+  signatures: Array<{ partyRole: "mandant" | "mandataire"; signerEmail: string; signerName: string; signedAt: string; signatureImageDocumentId: string | null }>;
+};
 type Detail = {
   project: Project;
   invoices: Invoice[];
@@ -92,6 +100,7 @@ export default function ProjectWorkspace() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [createdInvitationUrl, setCreatedInvitationUrl] = useState("");
   const [createdInvitationEmail, setCreatedInvitationEmail] = useState("");
+  const [mandates, setMandates] = useState<Mandate[]>([]);
   const workspaceBuildings = session?.buildings.filter((building) => building.workspace_id === workspaceId) ?? [];
   const selectedProject = projects.find((project) => project.id === projectId);
   const visibleInvoices = detail?.invoices ?? [];
@@ -145,6 +154,17 @@ export default function ProjectWorkspace() {
     });
     return () => { active = false; };
   }, [projectId, selectedProject?.can_edit]);
+
+  useEffect(() => {
+    if (!projectId) { setMandates([]); return; }
+    let active = true;
+    jsonRequest(`/api/projects/${encodeURIComponent(projectId)}/mandates`).then((result: Mandate[]) => {
+      if (active) setMandates(result);
+    }).catch((cause) => {
+      if (active) setError(cause instanceof Error ? cause.message : "Mandats indisponibles.");
+    });
+    return () => { active = false; };
+  }, [projectId]);
 
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -355,6 +375,58 @@ export default function ProjectWorkspace() {
     }
   }
 
+  async function createMandate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedProject) return;
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    let amountLimitCents: number;
+    try { amountLimitCents = parseEuroToCents(String(data.get("amountLimit"))); if (amountLimitCents <= 0) throw new RangeError(); }
+    catch { setError("Saisissez un plafond de dépenses positif."); return; }
+    const mandateData = {
+      version: 1,
+      parties: {
+        mandant: { name: String(data.get("mandantName")), email: String(data.get("mandantEmail")), address: String(data.get("mandantAddress")) },
+        mandataire: { name: String(data.get("mandataireName")), email: String(data.get("mandataireEmail")), address: String(data.get("mandataireAddress")) },
+      },
+      project: { purpose: String(data.get("purpose")), address: String(data.get("address")) },
+      amountLimitCents,
+      authorizedMaterials: String(data.get("materials")).split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
+      terms: String(data.get("terms")),
+      effectiveOn: String(data.get("effectiveOn")), expiresOn: String(data.get("expiresOn")),
+    };
+    setSaving(true); setError(""); setMessage("");
+    try {
+      await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/mandates`, "POST", { title: String(data.get("title")), mandateData });
+      setMandates(await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/mandates`));
+      form.reset();
+      setMessage("Brouillon de mandat créé. Les deux parties peuvent le consulter et signer avec leur compte autorisé.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Création du mandat impossible."); }
+    finally { setSaving(false); }
+  }
+
+  async function signMandate(event: FormEvent<HTMLFormElement>, mandate: Mandate) {
+    event.preventDefault();
+    if (!selectedProject || !mandate.yourPartyRole) return;
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    if (data.get("consent") !== "on") { setError("Cochez la confirmation de lecture et de consentement pour signer."); return; }
+    setSaving(true); setError(""); setMessage("");
+    try {
+      const file = data.get("signatureImage");
+      const signatureImageDocumentId = selectedProject.can_edit && file instanceof File && file.size ? await uploadToProject(file) : null;
+      await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/mandates/${encodeURIComponent(mandate.id)}/sign`, "POST", {
+        partyRole: mandate.yourPartyRole,
+        signerName: String(data.get("signerName")),
+        consent: true,
+        signatureImageDocumentId,
+      });
+      setMandates(await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/mandates`));
+      setMessage("Signature enregistrée avec le compte authentifié et l’empreinte du mandat.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Signature impossible."); }
+    finally { setSaving(false); }
+  }
+
   if (loading && !session) return <p role="status">Chargement des chantiers.</p>;
   return (
     <>
@@ -412,6 +484,60 @@ export default function ProjectWorkspace() {
             {invitation.acceptedAt && invitation.userId && <button type="button" disabled={saving} onClick={() => void revokeProjectMember(invitation.userId!)}>Retirer l&apos;accès</button>}
           </li>)}</ul> : <p>Aucune invitation créée pour ce chantier.</p>}
         </section>}
+
+        <section className="ledger-panel" aria-labelledby="project-mandates-title">
+          <h2 id="project-mandates-title">Mandats de débours</h2>
+          {selectedProject.can_edit && <details>
+            <summary>Créer un brouillon de mandat</summary>
+            <form className="ledger-bar" onSubmit={createMandate}>
+              <label>Titre<input name="title" defaultValue={`Mandat de débours - ${selectedProject.name}`} required maxLength={200} /></label>
+              <label>Nom du mandant<input name="mandantName" required maxLength={200} /></label>
+              <label>E-mail du mandant<input name="mandantEmail" type="email" required maxLength={320} /></label>
+              <label>Adresse du mandant<input name="mandantAddress" required maxLength={500} /></label>
+              <label>Nom du mandataire<input name="mandataireName" required maxLength={200} /></label>
+              <label>E-mail du mandataire<input name="mandataireEmail" type="email" required maxLength={320} /></label>
+              <label>Adresse du mandataire<input name="mandataireAddress" required maxLength={500} /></label>
+              <label>Adresse du chantier<input name="address" required maxLength={500} /></label>
+              <label>Objet des travaux<input name="purpose" required maxLength={1000} /></label>
+              <label>Plafond d’achat TTC (€)<input name="amountLimit" inputMode="decimal" required /></label>
+              <label>Matériaux / achats autorisés (une ligne par poste)<textarea name="materials" rows={4} maxLength={12000} required /></label>
+              <label>Conditions du mandat<textarea name="terms" rows={5} maxLength={3000} defaultValue="Le mandataire agit au nom et pour le compte du mandant. Il remet les factures et justificatifs correspondant aux sommes avancées. Toute dépense hors du périmètre ou au-delà du plafond nécessite l’accord préalable du mandant." required /></label>
+              <label>Début de validité<input name="effectiveOn" type="date" defaultValue={localToday()} required /></label>
+              <label>Fin de validité<input name="expiresOn" type="date" required /></label>
+              <button disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer le brouillon"}</button>
+            </form>
+            <p role="note">Le brouillon est verrouillé dès la première signature. Vérifiez les noms, e-mails, achats autorisés, plafond et conditions avant de le créer.</p>
+          </details>}
+          {mandates.length ? mandates.map((mandate) => <details className="mandate-print" key={mandate.id}>
+            <summary>{mandate.title} · {mandate.signatures.length}/2 signatures</summary>
+            <article>
+              <h3>Mandat spécial de débours</h3>
+              <p><strong>Mandant :</strong> {mandate.mandateData.parties.mandant.name} — {mandate.mandateData.parties.mandant.address}</p>
+              <p><strong>Mandataire :</strong> {mandate.mandateData.parties.mandataire.name} — {mandate.mandateData.parties.mandataire.address}</p>
+              <p><strong>Chantier :</strong> {mandate.mandateData.project.address}</p>
+              <p><strong>Objet :</strong> {mandate.mandateData.project.purpose}</p>
+              <p><strong>Plafond TTC :</strong> {formatEuroCents(mandate.mandateData.amountLimitCents)}</p>
+              <p><strong>Achats autorisés :</strong></p>
+              <ul>{mandate.mandateData.authorizedMaterials.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
+              <p><strong>Conditions :</strong> {mandate.mandateData.terms}</p>
+              <p><strong>Validité :</strong> du {mandate.mandateData.effectiveOn} au {mandate.mandateData.expiresOn}</p>
+              <h4>Signatures électroniques</h4>
+              {(["mandant", "mandataire"] as const).map((role) => {
+                const signature = mandate.signatures.find((item) => item.partyRole === role);
+                return <p key={role}><strong>{role} :</strong> {signature ? `${signature.signerName} (${signature.signerEmail}), le ${new Date(signature.signedAt).toLocaleString("fr-FR")}` : "En attente"}</p>;
+              })}
+              <small>Empreinte du contenu signé (SHA-256) : {mandate.contentSha256}</small>
+            </article>
+            <button type="button" onClick={() => window.print()}>Imprimer / enregistrer en PDF</button>
+            {mandate.yourPartyRole && !mandate.signatures.some((signature) => signature.partyRole === mandate.yourPartyRole) && <form className="ledger-bar" onSubmit={(event) => void signMandate(event, mandate)}>
+              <label>Nom affiché pour la signature<input name="signerName" defaultValue={mandate.mandateData.parties[mandate.yourPartyRole].name} required maxLength={200} /></label>
+              {selectedProject.can_edit && <label>Image facultative pour le rendu<input name="signatureImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>}
+              <label className="checkbox-label"><input type="checkbox" name="consent" required /> J’ai lu le mandat, j’en accepte les conditions et je souhaite le signer électroniquement.</label>
+              <button disabled={saving}>{saving ? "Signature…" : "Signer ce mandat"}</button>
+            </form>}
+          </details>) : <p>Aucun mandat créé pour ce chantier.</p>}
+          <p role="note">La signature enregistrée est liée au compte authentifié, à l’horodatage et à l’empreinte du contenu. Une image de signature est uniquement un élément visuel. Cette fonction ne fournit pas de signature électronique qualifiée. L’impression PDF passe par la fonction d’impression du navigateur.</p>
+        </section>
 
         <details className="ledger-panel">
           <summary>Repères fiscaux officiels — chaque facture reste à qualifier</summary>

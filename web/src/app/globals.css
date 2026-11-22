@@ -96,3 +96,10 @@ h2 { margin: 0; font-size: 25px; line-height: 1.2; letter-spacing: -.045em; font
   .footer { align-items: start; flex-direction: column; justify-content: center; gap: 5px; padding: 14px 0; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+@media print {
+  body * { visibility: hidden; }
+  .mandate-print, .mandate-print * { visibility: visible; }
+  .mandate-print { position: relative; break-inside: avoid; border: 0; }
+  .mandate-print > summary, .mandate-print > form, .mandate-print > button { display: none; }
+  .mandate-print article { position: absolute; inset: 0 auto auto 0; width: 100%; }
+}
