@@ -51,6 +51,8 @@ The browser first extracts each PDF page's native text with PDF.js. It renders o
 
 The OCR/PDF workers, WASM cores, French model, PDF CMaps, and standard fonts are copied from pinned npm packages into ignored build output under `web/public/ocr`. This keeps OCR assets same-origin and avoids sending invoice contents to an external OCR service. Deployments must run the asset-copy lifecycle script before serving the app.
 
+Invoice search is executed on the server within the selected project. French full-text GIN indexes cover supplier/reference and product/service descriptions; B-tree indexes cover invoice totals and line totals. Amount filters match either the invoice total or a line total. Filtered invoice rows do not change the separately computed full-project debours balance.
+
 
 ## Project debours
 

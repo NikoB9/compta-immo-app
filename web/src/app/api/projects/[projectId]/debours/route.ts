@@ -1,6 +1,7 @@
 import { AccessConfigurationError } from "@/server/auth/cloudflare-access";
 import { RequestAuthorizationError, withAuthenticatedActor } from "@/server/auth/authenticated-actor";
 import { reconcileDebours } from "../../../../../../../packages/domain/src/reconcile-debours.js";
+import { parseEuroToCents } from "../../../../../../../packages/domain/src/money.js";
 import { readUtf8Body, RequestBodyError } from "@/server/http/request-body";
 import { appendAuditEvent, isUuid, LedgerRequestError, requireOwnedWorkspace } from "@/server/ledger/repository";
 
@@ -15,6 +16,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   try {
     const { projectId } = await params;
     if (!isUuid(projectId)) throw new LedgerRequestError("Chantier introuvable.", 404);
+    const searchFilters = parseInvoiceSearch(new URL(request.url).searchParams);
     const data = await withAuthenticatedActor(request, async (client) => {
       const project = await client.query<{ id: string; workspace_id: string; name: string; status: string; can_edit: boolean }>(
         `SELECT p.id, p.workspace_id, p.name, p.status,
@@ -92,12 +94,43 @@ export async function GET(request: Request, { params }: RouteContext) {
          FROM app.supplier_invoice i
          JOIN app.project_document d ON d.workspace_id = i.workspace_id AND d.document_id = i.invoice_document_id
          WHERE d.project_id = $1 AND i.workspace_id = $2
+           AND (
+             $3::text = ''
+             OR numnode(plainto_tsquery('french', $3)) = 0
+             OR to_tsvector('french', coalesce(i.supplier_name, '') || ' ' || coalesce(i.invoice_number, ''))
+                @@ plainto_tsquery('french', $3)
+             OR EXISTS (
+               SELECT 1 FROM app.invoice_line_item search_line
+               WHERE search_line.workspace_id = i.workspace_id AND search_line.invoice_id = i.id
+                 AND to_tsvector('french', search_line.description) @@ plainto_tsquery('french', $3)
+             )
+           )
+           AND (
+             ($4::bigint IS NULL AND $5::bigint IS NULL)
+             OR (i.invoice_total_cents >= COALESCE($4::bigint, 0)
+                 AND i.invoice_total_cents <= COALESCE($5::bigint, 9223372036854775807))
+             OR EXISTS (
+               SELECT 1 FROM app.invoice_line_item amount_line
+               WHERE amount_line.workspace_id = i.workspace_id AND amount_line.invoice_id = i.id
+                 AND amount_line.line_total_cents IS NOT NULL
+                 AND amount_line.line_total_cents >= COALESCE($4::bigint, 0)
+                 AND amount_line.line_total_cents <= COALESCE($5::bigint, 9223372036854775807)
+             )
+           )
          ORDER BY i.invoice_date DESC NULLS LAST, i.created_at DESC, i.id`,
+        [projectId, projectRow.workspace_id, searchFilters.query, searchFilters.minCents, searchFilters.maxCents],
+      );
+      const allProjectInvoices = await client.query<{ id: string; invoice_total_cents: string }>(
+        `SELECT i.id, i.invoice_total_cents::text
+         FROM app.supplier_invoice i
+         JOIN app.project_document d ON d.workspace_id = i.workspace_id AND d.document_id = i.invoice_document_id
+         WHERE d.project_id = $1 AND i.workspace_id = $2`,
         [projectId, projectRow.workspace_id],
       );
-      const invoiceMap = new Map<string, { id: string; totalCents: number }>();
+      const invoiceMap = new Map<string, { id: string; totalCents: number }>(allProjectInvoices.rows.map((invoice) => [
+        invoice.id, { id: invoice.id, totalCents: safeCents(invoice.invoice_total_cents) },
+      ]));
       const invoices = projectInvoices.rows.map((invoice) => {
-        invoiceMap.set(invoice.id, { id: invoice.id, totalCents: safeCents(invoice.invoice_total_cents) });
         return {
           id: invoice.id,
           supplierName: invoice.supplier_name,
@@ -142,11 +175,34 @@ export async function GET(request: Request, { params }: RouteContext) {
         supplierPayments: rows.filter((row) => row.movementType === "supplier_payment")
           .map((row) => ({ amountCents: row.amountCents, invoiceId: row.invoiceId })),
       });
-      return { project: projectRow, invoices, movements: rows, summary };
+      return { project: projectRow, invoices, invoiceCount: allProjectInvoices.rows.length, movements: rows, summary };
     });
     return json(data);
   } catch (error) {
     return errorResponse(error);
+  }
+}
+
+function parseInvoiceSearch(params: URLSearchParams) {
+  const query = params.get("q")?.trim() ?? "";
+  if (query.length > 120 || query.includes("\0")) throw new LedgerRequestError("Recherche trop longue.", 422);
+  const minCents = parseOptionalSearchAmount(params.get("min"), "Montant minimum");
+  const maxCents = parseOptionalSearchAmount(params.get("max"), "Montant maximum");
+  if (minCents !== null && maxCents !== null && minCents > maxCents) {
+    throw new LedgerRequestError("Le montant minimum doit être inférieur ou égal au montant maximum.", 422);
+  }
+  return { query, minCents, maxCents };
+}
+
+function parseOptionalSearchAmount(value: string | null, label: string) {
+  if (value === null || value.trim() === "") return null;
+  if (value.length > 32) throw new LedgerRequestError(`${label} invalide.`, 422);
+  try {
+    const cents = parseEuroToCents(value);
+    if (cents < 0) throw new Error();
+    return cents;
+  } catch {
+    throw new LedgerRequestError(`${label} invalide.`, 422);
   }
 }
 

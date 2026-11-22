@@ -21,9 +21,19 @@ type Movement = {
 type Detail = {
   project: Project;
   invoices: Invoice[];
+  invoiceCount: number;
   movements: Movement[];
   summary: Record<string, number>;
 };
+
+function projectDetailUrl(projectId: string, search: string, min: string, max: string) {
+  const params = new URLSearchParams();
+  if (search.trim()) params.set("q", search.trim());
+  if (min.trim()) params.set("min", min.trim());
+  if (max.trim()) params.set("max", max.trim());
+  const suffix = params.toString();
+  return `/api/projects/${encodeURIComponent(projectId)}/debours${suffix ? `?${suffix}` : ""}`;
+}
 
 async function jsonRequest(url: string, method = "GET", body?: unknown) {
   const response = await fetch(url, {
@@ -79,17 +89,7 @@ export default function ProjectWorkspace() {
   const [invoiceFields, setInvoiceFields] = useState({ supplier: "", invoiceNumber: "", invoiceDate: "", total: "" });
   const workspaceBuildings = session?.buildings.filter((building) => building.workspace_id === workspaceId) ?? [];
   const selectedProject = projects.find((project) => project.id === projectId);
-  const visibleInvoices = (detail?.invoices ?? []).filter((invoice) => {
-    const query = invoiceSearch.trim().toLocaleLowerCase("fr");
-    const text = [invoice.supplierName, invoice.invoiceNumber ?? "", ...invoice.lineItems.map((line) => line.description)].join(" ").toLocaleLowerCase("fr");
-    const min = invoiceMin.trim() ? Number(invoiceMin.replace(",", ".")) * 100 : null;
-    const max = invoiceMax.trim() ? Number(invoiceMax.replace(",", ".")) * 100 : null;
-    const hasAmountFilter = min !== null || max !== null;
-    const inRange = (amount: number) => (min === null || amount >= min) && (max === null || amount <= max);
-    const amountMatches = !hasAmountFilter || inRange(invoice.totalCents)
-      || invoice.lineItems.some((line) => line.lineTotalCents !== null && inRange(line.lineTotalCents));
-    return (!query || text.includes(query)) && amountMatches;
-  });
+  const visibleInvoices = detail?.invoices ?? [];
 
   useEffect(() => {
     let active = true;
@@ -120,13 +120,15 @@ export default function ProjectWorkspace() {
   useEffect(() => {
     if (!projectId) return;
     let active = true;
-    jsonRequest(`/api/projects/${encodeURIComponent(projectId)}/debours`).then((result: Detail) => {
-      if (active) { setDetail(result); setError(""); }
-    }).catch((cause: unknown) => {
-      if (active) setError(cause instanceof Error ? cause.message : "Débours indisponibles.");
-    });
-    return () => { active = false; };
-  }, [projectId]);
+    const timer = setTimeout(() => {
+      jsonRequest(projectDetailUrl(projectId, invoiceSearch, invoiceMin, invoiceMax)).then((result: Detail) => {
+        if (active) { setDetail(result); setError(""); }
+      }).catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error ? cause.message : "Débours indisponibles.");
+      });
+    }, 250);
+    return () => { active = false; clearTimeout(timer); };
+  }, [projectId, invoiceSearch, invoiceMin, invoiceMax]);
 
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -204,7 +206,7 @@ export default function ProjectWorkspace() {
           },
         });
       }
-      setDetail(await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/debours`));
+      setDetail(await jsonRequest(projectDetailUrl(selectedProject.id, invoiceSearch, invoiceMin, invoiceMax)));
       form.reset();
       setInvoiceFields({ supplier: "", invoiceNumber: "", invoiceDate: "", total: "" });
       setInvoiceOcr(null);
@@ -252,7 +254,7 @@ export default function ProjectWorkspace() {
         lineTotalCents: optionalEuroInput(String(data.get("lineTotal"))),
         reviewStatus: status,
       });
-      setDetail(await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/debours`));
+      setDetail(await jsonRequest(projectDetailUrl(selectedProject.id, invoiceSearch, invoiceMin, invoiceMax)));
       setMessage("Ligne mise à jour; le statut de revue est enregistré.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "La correction de la ligne a échoué."); }
     finally { setSaving(false); }
@@ -281,7 +283,7 @@ export default function ProjectWorkspace() {
         paidInCash,
         note: String(data.get("note")),
       });
-      setDetail(await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/debours`));
+      setDetail(await jsonRequest(projectDetailUrl(selectedProject.id, invoiceSearch, invoiceMin, invoiceMax)));
       form.reset();
       setMessage("Mouvement de débours enregistré.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Enregistrement impossible."); }
@@ -371,7 +373,7 @@ export default function ProjectWorkspace() {
         </section>}
 
         <section className="ledger-panel" aria-labelledby="project-invoices-title">
-          <h2 id="project-invoices-title">Factures ({visibleInvoices.length}{visibleInvoices.length !== detail.invoices.length ? ` / ${detail.invoices.length}` : ""})</h2>
+          <h2 id="project-invoices-title">Factures ({visibleInvoices.length}{visibleInvoices.length !== detail.invoiceCount ? ` / ${detail.invoiceCount}` : ""})</h2>
           <div className="ledger-bar" role="search" aria-label="Rechercher une facture ou une ligne">
             <label>Fournisseur, référence ou produit<input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} placeholder="Ex. peinture, fournisseur, référence" /></label>
             <label>Montant min. (€)<input inputMode="decimal" value={invoiceMin} onChange={(event) => setInvoiceMin(event.target.value)} /></label>
