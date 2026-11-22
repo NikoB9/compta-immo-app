@@ -43,7 +43,7 @@
 - Project UI/API now creates projects by address, adds project invoices with manual supplier/date/number/total fields and uploaded documents, records advances/payments/reimbursements/refunds/returns, and shows the two-way debours reconciliation. Existing project guests can read assigned-project data; all mutation routes enforce owner access. Invoice/payment amounts stay marked for review; OCR is not implemented.
 - Planned invoice extraction explicitly includes every detected product/service line, editable source-traceable fields, and permission-scoped filtering/search by invoice and line-item amount/text.
 - Added PostgreSQL storage for OCR runs and product/service lines with source page, confidence, review state, tax amount/rate fields, workspace RLS, guest project read policy, and runtime grants. The project invoice API returns these rows; the chantier UI displays them and filters invoices by supplier/reference/product text and by invoice or line amount. OCR execution and editing/confirmation controls remain unimplemented.
-- Added an in-app fiscal guardrail note and linked official tax sources. It distinguishes the VAT definition of d�bours from French property-income expense deductibility and flags pre-letting work for human review; it makes no tax qualification. Supporting source notes are in docs/tax-guardrails.md.
+- Added an in-app fiscal guardrail note and linked official tax sources. It distinguishes the VAT definition of débours from French property-income expense deductibility and flags pre-letting work for human review; it makes no tax qualification. Supporting source notes are in docs/tax-guardrails.md.
 
 ## Verification status (updated 2026-11-22)
 
@@ -52,23 +52,23 @@
 - Initial `npm run build` before PostgreSQL dependencies: passed after setting the Turbopack root for the shared domain package and rendering the year selector at request time. After adding `pg`, the Windows OneDrive checkout blocks Turbopack's junction creation. Webpack compiles successfully, but final static output hits a OneDrive `EPERM` error.
 - `npm run lint`: did not finish after more than 60 seconds while loading ESLint configuration; stopped, not a pass.
 - Browser preview: local dev server reported ready, but the browser connection to `localhost:3000` timed out in this execution environment.
-- GitHub Actions ran on the connected public repository. The PostgreSQL 18 migration and RLS smoke job passed, including migration 0005. The web lint job initially failed on React set-state-in-effect and unescaped apostrophe findings; fixes were published in the latest commit, whose CI result is still pending.
-- PostgreSQL migration 0005 and RLS smoke script passed in the GitHub PostgreSQL 18 job. They have not been run in this Windows environment; `psql` is unavailable and the local Docker engine is inaccessible.
+- GitHub Actions run 24 completed successfully on the latest PR head: PostgreSQL 18 migrations (including 0005), RLS smoke checks, 18 domain tests, ESLint, and the Next.js production build all passed.
+- Migration 0005 and the RLS smoke script passed in GitHub Actions PostgreSQL 18; they have not been run in the local Windows environment (psql unavailable, Docker inaccessible).
 - `npx tsc --noEmit --incremental false`: passed with the Access verifier, PostgreSQL pool, and session API.
 - `npx tsc --noEmit --incremental false`: passed with the ledger endpoints and UI integration.
-- `npx tsc --noEmit --incremental false`: attempted after invoice line-item API/UI changes, but the process produced no output and did not finish within 30 seconds; no pass is claimed.
+- Local `npx tsc --noEmit --incremental false` after invoice line-item changes did not finish within 30 seconds; GitHub Actions production build passed on the same source revision.
 - Webpack compiled the complete app successfully with `webpackBuildWorker` disabled for diagnosis, but the build then failed during static output work with Windows OneDrive `EPERM`. The default Turbopack build also cannot create a junction for the external `pg` package (OS access denied). GitHub CI runs on Linux.
-- PostgreSQL migrations, constraints, runtime grants and the session/ledger APIs have not been executed against a database in this environment; `psql` is unavailable and Docker is inaccessible. Migration 0005 adds invoice extraction runs and line items but also awaits live execution.
+- The PostgreSQL schema and RLS smoke tests have been executed in GitHub Actions, not against a production database. Invoice routes and private-volume behavior still need a runtime integration smoke test.
 - Invoice upload/preview and project movement/invoice routes have not been exercised against a mounted private volume or live PostgreSQL database in this environment.
 
 ## Next tasks
 
-1. Run PostgreSQL 18 migrations and RLS smoke checks in CI; the schema and session/ledger routes have not yet been exercised against a live database.
+1. Implement local invoice OCR for invoice metadata and every product/service line, then add correction/confirmation controls and source provenance.
 2. Configure Cloudflare Access, bootstrap the owner workspace/address/units, provision invited guests, implement invitation acceptance and verify owner/guest flows.
 3. Implement local invoice OCR for supplier/date/reference/totals and all product/service lines, with a correction table, per-field confidence/source-page trace, and no silent calculation or tax classification. Add per-field editing/confirmation and server-side indexed search/filter over invoices and lines, scoped by project/property permissions.
 4. Implement project invitations and acceptance, payment evidence lifecycle, mandate generation/signing, ZIP export bundles, provider sync, and Proxmox deployment.
 5. Add malware scanning, backups, retention, accessible component verification, and a live PostgreSQL/private-volume smoke run before production use.
-6. Confirm the latest CI after the lint fixes, then clear remaining build/type issues before considering the foundation stable.
+6. Run invitation, signing, provider-sync, backup/restore, and private-volume checks as those slices are implemented; keep production deployment blocked until these operational controls are complete.
 
 ## Key files
 
