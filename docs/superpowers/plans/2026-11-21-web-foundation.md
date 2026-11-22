@@ -52,8 +52,8 @@
 - Initial `npm run build` before PostgreSQL dependencies: passed after setting the Turbopack root for the shared domain package and rendering the year selector at request time. After adding `pg`, the Windows OneDrive checkout blocks Turbopack's junction creation. Webpack compiles successfully, but final static output hits a OneDrive `EPERM` error.
 - `npm run lint`: did not finish after more than 60 seconds while loading ESLint configuration; stopped, not a pass.
 - Browser preview: local dev server reported ready, but the browser connection to `localhost:3000` timed out in this execution environment.
-- GitHub workflow has not run because there is no remote repository yet.
-- PostgreSQL migration and RLS smoke script are added but have not been executed in this Windows environment; `psql` is unavailable and the local Docker engine is inaccessible. The PostgreSQL 18 CI job will execute them after a remote repository is connected.
+- GitHub Actions ran on the connected public repository. The PostgreSQL 18 migration and RLS smoke job passed, including migration 0005. The web lint job initially failed on React set-state-in-effect and unescaped apostrophe findings; fixes were published in the latest commit, whose CI result is still pending.
+- PostgreSQL migration 0005 and RLS smoke script passed in the GitHub PostgreSQL 18 job. They have not been run in this Windows environment; `psql` is unavailable and the local Docker engine is inaccessible.
 - `npx tsc --noEmit --incremental false`: passed with the Access verifier, PostgreSQL pool, and session API.
 - `npx tsc --noEmit --incremental false`: passed with the ledger endpoints and UI integration.
 - `npx tsc --noEmit --incremental false`: attempted after invoice line-item API/UI changes, but the process produced no output and did not finish within 30 seconds; no pass is claimed.
@@ -68,7 +68,7 @@
 3. Implement local invoice OCR for supplier/date/reference/totals and all product/service lines, with a correction table, per-field confidence/source-page trace, and no silent calculation or tax classification. Add per-field editing/confirmation and server-side indexed search/filter over invoices and lines, scoped by project/property permissions.
 4. Implement project invitations and acceptance, payment evidence lifecycle, mandate generation/signing, ZIP export bundles, provider sync, and Proxmox deployment.
 5. Add malware scanning, backups, retention, accessible component verification, and a live PostgreSQL/private-volume smoke run before production use.
-6. Run CI on the connected public GitHub repository and resolve the local ESLint/config loading stall.
+6. Confirm the latest CI after the lint fixes, then clear remaining build/type issues before considering the foundation stable.
 
 ## Key files
 
