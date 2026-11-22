@@ -15,3 +15,4 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON app.project_movement TO app_runtime;
 GRANT SELECT, INSERT ON app.supplier_invoice TO app_runtime;
 GRANT SELECT ON app.invoice_payment TO app_runtime;
 GRANT SELECT, INSERT ON app.project_document TO app_runtime;
+GRANT SELECT, INSERT, UPDATE, DELETE ON app.invoice_extraction_run, app.invoice_line_item TO app_runtime;
