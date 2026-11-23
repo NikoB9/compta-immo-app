@@ -78,8 +78,10 @@ Configurez le tunnel Cloudflare ou votre proxy inverse pour joindre `http://127.
 ## Exploitation
 
 - À chaque mise à jour, construisez d’abord l’image avec `docker compose --env-file infra/deploy/.env build app`, appliquez ensuite les migrations avec `docker compose --env-file infra/deploy/.env --profile ops run --rm migrate`, puis démarrez l’application avec `docker compose --env-file infra/deploy/.env up -d app`.
-- Sauvegardez PostgreSQL **et** le volume `private_documents`, puis testez régulièrement une restauration.
-- Les sauvegardes, l’analyse antivirus, la configuration Cloudflare Access et le test des parcours propriétaire/invité restent à organiser avant une mise en production réelle.
+- La sauvegarde exige Docker Compose, `tar` et `sha256sum` sur l’hôte ; exécutez-la depuis la racine du dépôt ou appelez le script par son chemin.
+- Sauvegardez PostgreSQL **et** le volume `private_documents` avec `sh infra/deploy/backup.sh`. Le script arrête brièvement l’application pour prendre les deux copies sans écritures applicatives concurrentes, valide les formats et empreintes, protège les fichiers avec les permissions du compte qui l’exécute, puis redémarre l’application. Le dossier de sauvegarde par défaut est `backups/` ; définissez `BACKUP_DIR=/chemin/hors-du-dépôt` pour choisir un volume de sauvegarde externe. Les sauvegardes contiennent des pièces et des données comptables : protégez aussi le volume de sauvegarde, chiffrez-le au repos et stockez-en une copie hors de la machine.
+- La création et la validation des archives sont automatisées ; la restauration complète et son essai périodique restent à réaliser. Avant livraison, restaurer dans une base et un volume isolés, vérifier les comptes/permissions, puis ouvrir quelques pièces avec les parcours autorisés.
+- L’analyse antivirus, la configuration Cloudflare Access, la copie chiffrée/hors site des sauvegardes et le test des parcours propriétaire/invité restent à organiser avant une mise en production réelle.
 - Pour les mises à jour PostgreSQL majeures, suivez la procédure officielle `pg_upgrade` ; changer simplement le tag de l’image ne migre pas le répertoire de données.
 
 Cette configuration n’installe ni ne configure Proxmox, Cloudflare Access, les sauvegardes ou l’analyse antivirus. Vérifiez la politique d’accès et la restauration avant d’y placer des documents comptables.
