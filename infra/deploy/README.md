@@ -1,6 +1,6 @@
 # Déploiement autonome
 
-Cette configuration lance PostgreSQL et l’application web dans deux conteneurs. Elle convient à un hôte Docker, y compris une VM Proxmox. PostgreSQL reste sur un réseau privé Docker ; seul le port HTTP de l’application est publié sur `127.0.0.1:3000` pour un tunnel ou un proxy inverse local.
+Cette configuration lance PostgreSQL, ClamAV et l’application web dans trois conteneurs. Elle convient à un hôte Docker, y compris une VM Proxmox. PostgreSQL et ClamAV restent sur un réseau privé Docker ; seul le port HTTP de l’application est publié sur `127.0.0.1:3000` pour un tunnel ou un proxy inverse local. ClamAV analyse chaque pièce avant son écriture privée ; l’application refuse les fichiers si le scanner est absent ou ne peut pas répondre.
 
 ## Préparer les secrets
 
@@ -73,7 +73,9 @@ docker compose --env-file infra/deploy/.env ps
 
 Le service conserve les justificatifs dans le volume `private_documents`, monté au chemin privé configuré dans l’image. Les octets ne sont pas placés dans PostgreSQL. Montez ou sauvegardez ce volume avec des permissions accessibles à l’UID 1001 du conteneur. L’image Next.js est construite en mode autonome et démarre avec l’utilisateur non privilégié `nextjs`.
 
-Configurez le tunnel Cloudflare ou votre proxy inverse pour joindre `http://127.0.0.1:3000`. N’exposez pas le port PostgreSQL. Le contrôle de santé HTTP attend la réponse `401` de l’application lorsqu’aucun JWT Cloudflare Access n’est fourni.
+Au premier démarrage, ClamAV initialise puis met à jour sa base de signatures ; l’application attend que le scanner soit sain. La durée dépend de l’hôte et du téléchargement. La base est gardée dans le volume `clamav_signatures`. Le protocole TCP du scanner n’est ni chiffré ni authentifié ; gardez son port 3310 dans le réseau privé Compose et ne le publiez jamais sur l’hôte.
+
+Configurez le tunnel Cloudflare ou votre proxy inverse pour joindre `http://127.0.0.1:3000`. N’exposez pas les ports PostgreSQL ou ClamAV. Le contrôle de santé HTTP attend la réponse `401` de l’application lorsqu’aucun JWT Cloudflare Access n’est fourni.
 
 ## Exploitation
 
@@ -82,7 +84,9 @@ Configurez le tunnel Cloudflare ou votre proxy inverse pour joindre `http://127.
 - Sauvegardez PostgreSQL **et** le volume `private_documents` avec `sh infra/deploy/backup.sh`. Le script arrête brièvement l’application pour prendre les deux copies sans écritures applicatives concurrentes, valide les formats et empreintes, protège les fichiers avec les permissions du compte qui l’exécute, puis redémarre l’application. Le dossier de sauvegarde par défaut est `backups/` ; définissez `BACKUP_DIR=/chemin/hors-du-dépôt` pour choisir un volume de sauvegarde externe. Les sauvegardes contiennent des pièces et des données comptables : protégez aussi le volume de sauvegarde, chiffrez-le au repos et stockez-en une copie hors de la machine.
 - Pour préparer une restauration sans remplacer la base ou le volume actifs, lancez `sh infra/deploy/restore-staging.sh /chemin/vers/compta-immo-<horodatage>`. Le script vérifie les empreintes, les chemins UUID et les types de fichiers de l’archive, crée une base neuve `restore_*` et un volume Docker `compta_restore_documents_*`, restaure les données et réapplique les droits runtime. Il supprime ses deux ressources s’il échoue, et les conserve si elles sont créées avec succès afin de permettre la vérification. Les noms exacts sont affichés à la fin. Les SHA-256 détectent une corruption accidentelle ; ils ne prouvent pas l’origine ni l’intégrité contre une modification malveillante. Ne restaurez que vos propres archives de confiance.
 - Cette restauration de staging exige le service PostgreSQL actif. Les rôles PostgreSQL sont partagés par le cluster et ne figurent pas dans le dump d’une seule base ; sur un nouveau cluster, créez aussi le rôle LOGIN runtime comme indiqué plus haut, puis accordez-lui `app_runtime`. Cette étape restaure les archives, mais l’essai de bout en bout via l’application et les parcours propriétaire/invité reste à réaliser avant livraison.
-- L’analyse antivirus, la configuration Cloudflare Access, la copie chiffrée/hors site des sauvegardes et le test des parcours propriétaire/invité restent à organiser avant une mise en production réelle.
+- Tester la détection avec le fichier de test EICAR dans un environnement isolé, puis vérifier que les mises à jour de signatures restent saines. ClamAV réduit le risque sans garantir qu’un document est inoffensif ; la configuration Cloudflare Access, la copie chiffrée/hors site des sauvegardes, la rétention et les parcours propriétaire/invité restent à valider avant une mise en production réelle.
 - Pour les mises à jour PostgreSQL majeures, suivez la procédure officielle `pg_upgrade` ; changer simplement le tag de l’image ne migre pas le répertoire de données.
 
-Cette configuration n’installe ni ne configure Proxmox, Cloudflare Access, les sauvegardes ou l’analyse antivirus. Vérifiez la politique d’accès et la restauration avant d’y placer des documents comptables.
+Cette configuration n’installe ni ne configure Proxmox, Cloudflare Access, la planification et le chiffrement des sauvegardes, ni la politique de rétention. Vérifiez le scanner, la politique d’accès et la restauration avant d’y placer des documents comptables.
+
+Références techniques : [image Docker officielle ClamAV](https://docs.clamav.net/manual/Installing/Docker.html), [protocole ClamD INSTREAM](https://docs.clamav.net/manual/Usage/ClamdProtocol.html). Le scanner TCP n’a pas de chiffrement ni d’authentification et doit rester sur un réseau privé.

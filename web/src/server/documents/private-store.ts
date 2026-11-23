@@ -2,6 +2,7 @@ import "server-only";
 
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { isAbsolute, parse, resolve, sep } from "node:path";
+import { assertDocumentIsClean, DocumentScanError } from "./clamav-scanner";
 
 export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -60,6 +61,12 @@ export function sanitizeDocumentFilename(value: string | null) {
 export async function writePrivateDocument(objectKey: string, bytes: Uint8Array) {
   const filePath = resolveObjectPath(objectKey);
   const root = getPrivateDocumentRoot();
+  try {
+    await assertDocumentIsClean(bytes);
+  } catch (error) {
+    if (error instanceof DocumentScanError) throw new PrivateDocumentError(error.message, error.status);
+    throw error;
+  }
   await mkdir(root, { recursive: true, mode: 0o700 });
   await mkdir(resolve(root, objectKey.split("/")[0]), { recursive: true, mode: 0o700 });
   await writeFile(filePath, bytes, { flag: "wx", mode: 0o600 });

@@ -33,6 +33,17 @@ services:
     networks:
       - private
 
+  clamav:
+    image: clamav/clamav:1.5.5
+    restart: unless-stopped
+    environment:
+      CLAMAV_NO_MILTERD: "true"
+      CLAMD_CONF_StreamMaxLength: 32M
+    volumes:
+      - clamav_signatures:/var/lib/clamav
+    networks:
+      - private
+
   app:
     build:
       context: .
@@ -43,12 +54,16 @@ services:
       CLOUDFLARE_ACCESS_AUD: ${CLOUDFLARE_ACCESS_AUD:?Set CLOUDFLARE_ACCESS_AUD in infra/deploy/.env}
       CLOUDFLARE_ACCESS_TEAM_DOMAIN: ${CLOUDFLARE_ACCESS_TEAM_DOMAIN:?Set CLOUDFLARE_ACCESS_TEAM_DOMAIN in infra/deploy/.env}
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in infra/deploy/.env}
+      DOCUMENT_SCANNER_HOST: clamav
+      DOCUMENT_SCANNER_PORT: "3310"
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
       - private_documents:/var/lib/compta-immo/documents
     depends_on:
       database:
+        condition: service_healthy
+      clamav:
         condition: service_healthy
     networks:
       - private
@@ -74,3 +89,4 @@ networks:
 volumes:
   postgres_data:
   private_documents:
+  clamav_signatures:
