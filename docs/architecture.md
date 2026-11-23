@@ -35,7 +35,7 @@ Run `infra/postgres/ops/grant_runtime_session_access.sql` as the database owner,
 - A versioned, generated PDF mandate matching the supplied signed example; template `mandat-debours-v1.0` is currently generic and generated on demand.
 - Legal review of the simple electronic-signature evidence flow, and a qualified or specialist signature provider if the required assurance level calls for it.
 - Google Drive, Microsoft, or SFTP synchronization and conflict resolution.
-- Full restore automation and a tested disaster-recovery procedure. `infra/deploy/backup.sh` creates coordinated database/document archives and checks their readability and SHA-256; operators must still protect/encrypt/off-site the backups and prove restoration in an isolated environment.
+- A full disaster-recovery rehearsal and app-level restore validation. `infra/deploy/backup.sh` creates coordinated database/document archives and `restore-staging.sh` restores to a new database and volume; operators must still run these on the target host, verify restored records/documents, and protect/encrypt/off-site the backups.
 - Audit retention, deployment secrets management, and Proxmox installation/configuration.
 
 Do not put real accounting records in this schema until authentication, transaction-scoped identity, file authorization, backup/restore, and migration procedures have been implemented and reviewed.

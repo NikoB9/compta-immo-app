@@ -23,13 +23,13 @@
 - Chantiers, rapprochement des débours, justificatifs, invitations invité/propriétaire et export ZIP.
 - Mandats, PDF versionnés, signature applicative par partie et image visuelle facultative par signataire.
 - Schéma PostgreSQL, migrations, politiques RLS et workflow CI ; configuration Docker Compose et procédure de déploiement générique.
-- Sauvegarde cohérente de la base et des justificatifs, avec contrôle des archives. La restauration n’est pas encore automatisée ni éprouvée.
+- Sauvegarde cohérente de la base et des justificatifs et restauration dans une base/volume de staging séparés. Ces scripts ne sont pas exécutés dans l’environnement actuel ; le contrôle applicatif de la restauration reste à valider.
 
 ### Bloquants avant un pilote avec les vraies données
 
 1. Exécuter le déploiement sur l’hôte prévu : Cloudflare Access, secrets, migrations, rôles, propriétaire initial et règles d’accès aux invités.
 2. Faire un test de bout en bout avec données fictives sur PostgreSQL et le volume privé : propriétaire, invité, OCR, import/export, signatures, export ZIP et pièces.
-3. Restaurer une sauvegarde dans un environnement isolé et vérifier les données, les documents, les permissions et la reprise applicative.
+3. Exécuter la restauration staging sur l’hôte cible et vérifier les données, les documents, les permissions et les parcours dans l’application.
 4. Définir les protections opérationnelles des pièces : analyse antivirus, rétention, sauvegardes chiffrées/hors site et surveillance des erreurs.
 5. Vérifier l’accessibilité et l’usage mobile ; le manifeste PWA existe, mais aucun fonctionnement hors ligne n’est fourni.
 6. Rapprocher le registre du classeur existant et faire valider les traitements et exports fiscaux par une personne compétente avant de s’en servir pour une déclaration.

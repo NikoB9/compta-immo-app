@@ -1,8 +1,15 @@
 \set ON_ERROR_STOP on
 
--- One-time setup for the current read-only /api/auth/session endpoint.
--- Create the LOGIN role separately and grant it membership in app_runtime.
-CREATE ROLE app_runtime NOLOGIN;
+-- Runtime grants for the read-only /api/auth/session endpoint.
+-- Safe to reapply after restoring a database; the LOGIN role remains separate.
+DO $role$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'app_runtime') THEN
+    CREATE ROLE app_runtime NOLOGIN;
+  END IF;
+END
+$role$;
+ALTER ROLE app_runtime NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOLOGIN;
 GRANT USAGE ON SCHEMA app, app_private TO app_runtime;
 GRANT SELECT ON app.user_account, app.workspace, app.workspace_membership,
   app.construction_project, app.project_membership TO app_runtime;
