@@ -1,0 +1,76 @@
+services:
+  database:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-compta}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER in infra/deploy/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD in infra/deploy/.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./infra/postgres:/infra/postgres:ro
+    networks:
+      - private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  migrate:
+    image: postgres:18
+    profiles: ["ops"]
+    entrypoint: ["/bin/sh", "/infra/postgres/ops/apply_migrations.sh"]
+    environment:
+      DATABASE_MIGRATIONS_URL: ${MIGRATION_DATABASE_URL:?Set MIGRATION_DATABASE_URL in infra/deploy/.env}
+      MIGRATION_DIR: /infra/postgres/migrations
+    volumes:
+      - ./infra/postgres:/infra/postgres:ro
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - private
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_BASE_URL: ${APP_BASE_URL:?Set APP_BASE_URL in infra/deploy/.env}
+      CLOUDFLARE_ACCESS_AUD: ${CLOUDFLARE_ACCESS_AUD:?Set CLOUDFLARE_ACCESS_AUD in infra/deploy/.env}
+      CLOUDFLARE_ACCESS_TEAM_DOMAIN: ${CLOUDFLARE_ACCESS_TEAM_DOMAIN:?Set CLOUDFLARE_ACCESS_TEAM_DOMAIN in infra/deploy/.env}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in infra/deploy/.env}
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - private_documents:/var/lib/compta-immo/documents
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - private
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.status === 401 ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  private:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  private_documents:

@@ -4,7 +4,7 @@
 -- Create the LOGIN role separately and grant it membership in app_runtime.
 CREATE ROLE app_runtime NOLOGIN;
 GRANT USAGE ON SCHEMA app, app_private TO app_runtime;
-GRANT SELECT ON app.workspace, app.workspace_membership,
+GRANT SELECT ON app.user_account, app.workspace, app.workspace_membership,
   app.construction_project, app.project_membership TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.resolve_user_id_for_email(text) TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.owns_workspace(uuid) TO app_runtime;
