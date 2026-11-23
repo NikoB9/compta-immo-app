@@ -46,10 +46,11 @@ function projectDetailUrl(projectId: string, search: string, min: string, max: s
 }
 
 async function jsonRequest(url: string, method = "GET", body?: unknown) {
+  const multipart = body instanceof FormData;
   const response = await fetch(url, {
     method,
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: body === undefined || multipart ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
     cache: "no-store",
   });
   const result = await response.json();
@@ -455,13 +456,17 @@ export default function ProjectWorkspace() {
     setSaving(true); setError(""); setMessage("");
     try {
       const file = data.get("signatureImage");
-      const signatureImageDocumentId = selectedProject.can_edit && file instanceof File && file.size ? await uploadToProject(file) : null;
-      await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/mandates/${encodeURIComponent(mandate.id)}/sign`, "POST", {
-        partyRole: mandate.yourPartyRole,
-        signerName: String(data.get("signerName")),
-        consent: true,
-        signatureImageDocumentId,
-      });
+      const payload = file instanceof File && file.size
+        ? (() => {
+          const form = new FormData();
+          form.set("partyRole", mandate.yourPartyRole!);
+          form.set("signerName", String(data.get("signerName")));
+          form.set("consent", "true");
+          form.set("signatureImage", file);
+          return form;
+        })()
+        : { partyRole: mandate.yourPartyRole, signerName: String(data.get("signerName")), consent: true };
+      await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/mandates/${encodeURIComponent(mandate.id)}/sign`, "POST", payload);
       setMandates(await jsonRequest(`/api/projects/${encodeURIComponent(selectedProject.id)}/mandates`));
       setMessage("Signature enregistrée avec le compte authentifié et l’empreinte du mandat.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Signature impossible."); }
@@ -574,7 +579,7 @@ export default function ProjectWorkspace() {
             <a href={`/api/projects/${encodeURIComponent(selectedProject.id)}/mandates/${encodeURIComponent(mandate.id)}/pdf`}>Télécharger le PDF versionné</a>
             {mandate.yourPartyRole && !mandate.signatures.some((signature) => signature.partyRole === mandate.yourPartyRole) && <form className="ledger-bar" onSubmit={(event) => void signMandate(event, mandate)}>
               <label>Nom affiché pour la signature<input name="signerName" defaultValue={mandate.mandateData.parties[mandate.yourPartyRole].name} required maxLength={200} /></label>
-              {selectedProject.can_edit && <label>Image facultative pour le rendu<input name="signatureImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>}
+              <label>Image facultative de signature (visuelle)<input name="signatureImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>
               <label className="checkbox-label"><input type="checkbox" name="consent" required /> J’ai lu le mandat, j’en accepte les conditions et je souhaite le signer électroniquement.</label>
               <button disabled={saving}>{saving ? "Signature…" : "Signer ce mandat"}</button>
             </form>}
