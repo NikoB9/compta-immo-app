@@ -1,23 +1,22 @@
 # Compta Immo — application web
 
-Première coquille publique Next.js avec manifeste installable. Cette version ne contient ni connexion, ni base de données, ni import de pièces comptables. Les données réelles ne doivent jamais être ajoutées au dépôt.
+Application Next.js auto-hébergée pour le suivi comptable immobilier, les justificatifs et les chantiers. Les données personnelles, adresses, pièces, signatures, secrets et sauvegardes restent dans l’environnement privé de déploiement et ne doivent jamais être ajoutés au dépôt.
+
+## Configuration initiale
+
+Après création de la base, des rôles runtime et du service web, configurez `INITIAL_OWNER_EMAIL` dans l’environnement privé avec l’adresse vérifiée par Cloudflare Access. La personne correspondante ouvre `/configuration-initiale` pour créer le compte propriétaire, le premier espace, une adresse et trois lots. La route ne fonctionne que si aucun compte ni espace n’existe encore. Elle refuse les requêtes d’une autre identité Access et les requêtes cross-origin.
+
+Les migrations sont dans `../infra/postgres/migrations/`; les rôles et droits de déploiement sont documentés dans `../infra/deploy/README.md`. Les données saisies à l’écran ne sont pas enregistrées dans Git.
 
 ## Développement local
 
-```powershell
-npm ci
-npm run dev
-```
+La cible prévue est Node.js 24 LTS. Depuis `web/`, installez les dépendances avec `npm ci`, puis lancez `npm run dev`. Les routes métier nécessitent PostgreSQL, les migrations et les variables serveur décrites dans `.env.example`. Le mode local peut contourner le proxy Cloudflare, mais il ne crée pas d’identité utilisateur vérifiée pour les API ; utilisez des données fictives et ne connectez pas une base réelle.
 
-Ouvrir ensuite http://localhost:3000. La cible prévue est Node.js 24 LTS. Les documents et données privés seront ajoutés ultérieurement aux services privés, jamais au dépôt Git.
+## Fonctionnalités disponibles
 
-## État actuel
+- Authentification via Cloudflare Access et résolution d’un compte applicatif à partir de l’identité vérifiée.
+- Registre annuel persistant, import CSV atomique, export et gestion des justificatifs.
+- Suivi des chantiers, factures, débours, invitations et mandats avec traces d’accord/signature.
+- Export privé de projet et analyse antivirus des pièces par ClamAV.
 
-- Page d’accueil responsive et générique.
-- Manifeste PWA et icônes SVG.
-- Pas de service worker ni de cache de données privées.
-- Règles de montants, rapprochement des débours et CSV annuel versionné testés sans dépendance externe.
-- Registre annuel temporaire dans `/comptabilite`, avec saisie, modification, aperçu des imports CSV et export. Pour les essais, utilisez des données fictives. L'onglet conserve les écritures en mémoire jusqu'au départ de la page ou au rechargement.
-- Le rapprochement métier n’est pas encore relié à une base de données ou à l’interface.
-
-Exécuter les tests métier avec `npm test` depuis `web/`.
+Le déploiement, la restauration, les contrôles de sécurité opérationnels et les parcours réels propriétaire/invité doivent encore être validés avant usage comptable courant.

@@ -14,7 +14,7 @@ openssl rand -hex 32
 
 Générez deux mots de passe différents avec `openssl rand -hex 32`. Remplacez les valeurs de `POSTGRES_ADMIN_PASSWORD` et `DATABASE_URL`. Le mot de passe de l’URL `MIGRATION_DATABASE_URL` doit être celui de `POSTGRES_ADMIN_PASSWORD`. Les mots de passe hexadécimaux évitent les caractères qui nécessiteraient un encodage spécial dans une URL PostgreSQL. Le fichier `.env` ne doit pas être ajouté au dépôt.
 
-Renseignez le domaine d’équipe, l’audience de l’application Cloudflare Access et l’origine HTTPS publique exacte. Configurez dans Cloudflare Access une politique qui protège ce nom d’hôte et autorise les personnes prévues avant d’exposer le tunnel.
+Renseignez le domaine d’équipe, l’audience de l’application Cloudflare Access, l’origine HTTPS publique exacte et `INITIAL_OWNER_EMAIL` avec l’adresse exacte de la personne autorisée à créer le premier espace. Cette adresse doit correspondre à l’e-mail vérifié par Cloudflare Access. Configurez dans Cloudflare Access une politique qui protège ce nom d’hôte et autorise les personnes prévues avant d’exposer le tunnel.
 
 ## Initialiser la base
 
@@ -43,24 +43,7 @@ CREATE ROLE compta_app LOGIN;
 GRANT app_runtime TO compta_app;
 ```
 
-Les scripts SQL sont montés en lecture seule dans le conteneur PostgreSQL. La commande `\password` évite d’écrire le mot de passe en clair dans l’historique SQL. Utilisez pour `DATABASE_URL` le mot de passe que vous avez défini.
-
-Initialisez le propriétaire et les trois lots initiaux avec le script existant. Saisissez les valeurs dans une session interactive :
-
-```sql
-\prompt 'Email du propriétaire: ' owner_email
-\prompt 'Nom affiché: ' owner_display_name
-\prompt 'Nom de l’espace: ' workspace_name
-\prompt 'Libellé du bâtiment: ' building_label
-\prompt 'Adresse: ' address_line1
-\prompt 'Complément (vide si aucun): ' address_line2
-\prompt 'Code postal: ' postal_code
-\prompt 'Commune: ' locality
-\prompt 'Référence lot 1: ' unit_ref_1
-\prompt 'Référence lot 2: ' unit_ref_2
-\prompt 'Référence lot 3: ' unit_ref_3
-\i /infra/postgres/ops/bootstrap_owner.sql
-```
+Les scripts SQL sont montés en lecture seule dans le conteneur PostgreSQL. La commande `\password` évite d’écrire le mot de passe en clair dans l’historique SQL. Utilisez pour `DATABASE_URL` le mot de passe que vous avez défini. Les droits runtime incluent l’appel aux fonctions d’initialisation, mais celles-ci ne peuvent créer qu’un seul premier compte dans une base sans utilisateur ni espace.
 
 ## Démarrer l’application
 
@@ -70,6 +53,8 @@ docker compose --env-file infra/deploy/.env --profile ops run --rm migrate
 docker compose --env-file infra/deploy/.env up -d app
 docker compose --env-file infra/deploy/.env ps
 ```
+
+Ouvrez ensuite `APP_BASE_URL/configuration-initiale` avec le compte autorisé par Cloudflare Access. Le formulaire crée le propriétaire, son espace, une adresse et exactement trois lots. Le serveur vérifie à nouveau l’identité Access et `INITIAL_OWNER_EMAIL`; la fonction PostgreSQL verrouille l’opération et refuse toute seconde initialisation. Les informations saisies ne sont pas envoyées à Git ni à un script SQL interactif.
 
 Le service conserve les justificatifs dans le volume `private_documents`, monté au chemin privé configuré dans l’image. Les octets ne sont pas placés dans PostgreSQL. Montez ou sauvegardez ce volume avec des permissions accessibles à l’UID 1001 du conteneur. L’image Next.js est construite en mode autonome et démarre avec l’utilisateur non privilégié `nextjs`.
 

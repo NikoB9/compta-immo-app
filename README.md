@@ -10,4 +10,4 @@ The runtime database and private document store belong on the operator's server 
 
 ## Project status
 
-The public PWA shell, Cloudflare Access gate, authenticated session and annual-ledger API are under development in `web/`. PostgreSQL schema, migrations and row-access checks are in `infra/postgres/`; no production database is configured. See `docs/architecture.md` for the current boundaries and deployment prerequisites, and `docs/README-public.md` for repository handling.
+The application includes Cloudflare Access authentication, a persistent annual ledger, project and mandate workflows, private exports, and a protected first-owner setup flow. The PostgreSQL schema and migrations are deployed to the target CT; rebuilding and validating the web application and completing operational checks remain. See `docs/architecture.md` for current boundaries and `infra/deploy/README.md` for deployment steps. See `docs/README-public.md` for repository handling.

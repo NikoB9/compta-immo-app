@@ -1,4 +1,5 @@
 import Link from "next/link";
+import InitialSetupLink from "./initial-setup-link";
 
 const modules = [
   {
@@ -38,6 +39,7 @@ export default function Home() {
             Documents, comptabilité et suivi de chantier réunis dans un espace clair,
             conçu pour vous aider à garder chaque pièce au bon endroit.
           </p>
+          <InitialSetupLink />
         </div>
         <div className="hero-art" aria-hidden="true">
           <div className="sun" />
