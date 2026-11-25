@@ -27,9 +27,9 @@ trap 'rm -f "$temporary_script"' EXIT HUP INT TERM
     printf '\\i %s\n' "$migration"
     printf "INSERT INTO app_ops.schema_migration (version, checksum) VALUES ('%s', '%s');\n" "$version" "$checksum"
     printf '%s\n' '\elif :checksum_matches'
-    printf "\\echo Skipping already applied migration %s\n" "$version"
+    printf '%s\n' "\\echo Skipping already applied migration $version"
     printf '%s\n' '\else'
-    printf "\\echo Migration checksum mismatch for %s\n" "$version"
+    printf '%s\n' "\\echo Migration checksum mismatch for $version"
     printf '%s\n' '\quit 3'
     printf '%s\n' '\endif'
   done
@@ -42,3 +42,4 @@ trap 'rm -f "$temporary_script"' EXIT HUP INT TERM
 } > "$temporary_script"
 
 psql "$DATABASE_MIGRATIONS_URL" -v ON_ERROR_STOP=1 -f "$temporary_script"
+
