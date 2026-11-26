@@ -23,6 +23,9 @@ Faire des biens, factures et chantiers une chaîne cohérente : les informations
 4. Le texte intégral `recognized_text` est enregistré pour les factures OCRisées, mais la recherche actuelle ne l’interroge pas. Ses index couvrent les fournisseurs/références et descriptions des lignes. La recherche est limitée au chantier sélectionné.
 5. Les biens peuvent être ajoutés, mais pas encore modifiés ni archivés depuis l’interface. La création d’espaces de travail supplémentaires manque aussi, si plusieurs espaces par propriétaire sont nécessaires.
 6. Le plan d’architecture contient encore des états antérieurs au déploiement et à la gestion des biens; il faut le synchroniser avec les capacités réellement livrées.
+7. Le schéma a déjà `app.category`, `app.tax_profile` et des états de revue pour les écritures, mais l’interface ne propose ni classement par catégorie, ni profil fiscal par bien/lot/année, ni transition de revue. Le formulaire comptable ne montre pas le statut de revue et les écritures sont enregistrées en `needs_review`.
+8. Les pages métier renvoient vers l’accueil sans navigation commune ni sélection d’espace partagée; l’accueil reste une page générique indiquant que l’espace est « en construction ». Les erreurs serveur sont parfois ramenées à un message générique sans référence de diagnostic.
+9. La suppression d’une écriture comptable est déclenchée directement depuis la ligne. L’historique financier doit être protégé contre les suppressions accidentelles.
 
 ## Contraintes fixes
 
@@ -87,7 +90,24 @@ Faire des biens, factures et chantiers une chaîne cohérente : les informations
 
 Pour la location nue relevant du régime réel des revenus fonciers, le BOFiP rattache en principe les dépenses à l’année où elles sont effectivement acquittées, quelle que soit la date de facture, d’échéance ou d’exécution des travaux. Les acomptes de travaux suivent l’année de leur versement, même si les travaux ont lieu plus tard. Ainsi, le total du chantier reste une synthèse à sa clôture; le registre annuel suit les paiements à leurs dates. Cette règle ne confirme pas à elle seule qu’une dépense est fiscalement déductible : sa nature et les autres conditions restent à vérifier. Pour les paiements effectués par un mandataire, le parcours devra conserver la preuve du paiement, l’origine des fonds et le rapprochement du mandat; le cas concret devra être confirmé avec le conseil comptable du propriétaire.
 
-## Tranche 4 — recherche globale dans les factures et leur OCR
+## Tranche 4 — classement annuel et validation humaine
+
+### Capacités
+
+- Exposer le profil fiscal déjà prévu par le schéma pour chaque bien/lot et année : type de location, régime et état brouillon/à vérifier/confirmé. Garder les profils datés afin qu’un changement de régime ne réécrive pas les années passées.
+- Donner à chaque écriture une catégorie de recette/dépense et un état de revue visible. Permettre au propriétaire de confirmer, corriger ou exclure une écriture, avec date, acteur et journal d’audit.
+- Définir avec le propriétaire/conseil la liste des catégories et leur correspondance éventuelle aux lignes des formulaires fiscaux; versionner le mapping par année. Ne pas générer d’export fiscal qualifié avant validation de ce mapping.
+- Les imports CSV, factures OCR et paiements automatiques arrivent en brouillon/à vérifier. Une facture payée n’est pas automatiquement une charge déductible.
+
+### Critères d’acceptation
+
+- Le registre affiche la catégorie et le statut de revue; les écritures sont filtrables par état et catégorie.
+- Une écriture importée ou issue d’une facture ne peut entrer dans un export fiscal qu’après une revue explicite et une catégorie confirmée.
+- Les actions de confirmation, exclusion et correction sont auditées et soumises aux règles d’accès du propriétaire.
+- Le changement de profil fiscal pour une nouvelle année ne modifie pas les profils historiques.
+- Aucun mapping vers formulaire n’est livré sans validation de sa version annuelle et des catégories correspondantes.
+
+## Tranche 5 — recherche globale dans les factures et leur OCR
 
 ### Capacités
 
@@ -103,11 +123,21 @@ Pour la location nue relevant du régime réel des revenus fonciers, le BOFiP ra
 - L’ouverture d’un résultat revérifie l’autorisation du document; recherches et réponses sont privées et non mises en cache.
 - Les accents, variantes courantes et plusieurs mots donnent des résultats cohérents en français; les recherches vides ou trop larges sont bornées.
 
-## Tranche 5 — gestion des biens et finition du parcours
+## Tranche 6 — accueil, navigation et profil réutilisable
+
+- Remplacer l’accueil marketing/générique par un tableau de bord privé après authentification : accès rapides à Comptabilité, Biens et Chantiers, factures en attente, OCR à vérifier, mandats à signer et soldes de chantiers. N’afficher que les actions utiles, et ne pas calculer de conclusion fiscale.
+- Créer une navigation commune cohérente avec la page active, retour au tableau de bord et accès au profil. Conserver la même sélection d’espace entre les modules et éviter de présenter des données provenant de deux espaces différents sans indication claire.
+- Ajouter une page Profil pour maintenir une seule identité de compte (nom affiché et e-mail vérifié) et les renseignements d’entreprise réutilisables des mandats (adresse, statut professionnel, SIRET selon le cas). Le nom de plateforme reste fixe; un espace principal porte un seul nom dans ce périmètre.
+- Afficher des messages d’erreur compréhensibles avec une référence de diagnostic non sensible; fournir une marche à suivre sans exposer les détails techniques ni données privées.
+
+## Tranche 7 — gestion des biens, protection des données et accessibilité
 
 - Ajouter modification et archivage d’une adresse ou d’un lot; préserver l’historique et refuser la suppression définitive lorsqu’il existe des écritures, pièces ou chantiers liés.
-- Décider si un propriétaire peut créer plusieurs espaces dans l’interface; conserver un profil de compte unique avec un nom par espace.
-- Corriger les états vides et les liens entre Biens, Comptabilité et Chantiers; vérifier mobile, clavier et lecteur d’écran.
+- Remplacer la suppression immédiate des écritures par une confirmation avec le bien, la date et le montant visibles, et privilégier l’annulation/archivage audité quand une écriture a déjà des pièces ou paiements liés.
+- Compléter les états vides avec une prochaine action claire et des liens cohérents entre Biens, Comptabilité, Factures et Chantiers.
+- Faire une revue WCAG 2.2 AA des contrastes, focus clavier visible, ordre de tabulation, annonces de succès/erreur, libellés, zoom et reflow mobile; corriger les écarts vérifiés.
+- Tester les parcours au clavier et sur petit écran, notamment formulaire de facture, revue OCR, recherche et impression du mandat.
+- Le périmètre initial conserve un espace principal par compte. Ne planifier plusieurs espaces que si plusieurs entités/propriétaires deviennent un besoin confirmé.
 
 ## Travaux distincts toujours nécessaires avant usage réel
 
@@ -118,12 +148,14 @@ Pour la location nue relevant du régime réel des revenus fonciers, le BOFiP ra
 
 ## Ordre proposé et dépendances
 
-1. Valider la politique d’identité (qui est le mandant/mandataire, quand le SIRET est requis), la situation fiscale du propriétaire et le traitement des règlements via le mandataire; définir les champs profil et les catégories annuelles.
-2. Implémenter profil + préremplissage et versionner le schéma du mandat.
+1. Valider la politique d’identité (qui est le mandant/mandataire, quand le SIRET est requis), la situation fiscale du propriétaire et le traitement des règlements via le mandataire; définir le profil et le périmètre fiscal annuel.
+2. Implémenter le profil réutilisable et le préremplissage, puis versionner le schéma des mandats.
 3. Concevoir puis générer le nouveau PDF à partir du schéma versionné; contrôler les documents signés existants.
-4. Unifier la création et la liaison facture/écriture en transaction, avec idempotence et réconciliation projet.
-5. Indexer et exposer la recherche OCR globale sur le modèle de facture unifié.
-6. Ajouter l’édition/archivage des biens, synchroniser les documents d’architecture et effectuer la recette fonctionnelle puis opérationnelle.
+4. Exposer les catégories et états de revue avant de générer automatiquement les écritures liées aux factures et paiements.
+5. Unifier la création et la liaison facture/écriture en transaction, avec idempotence et réconciliation projet.
+6. Indexer et exposer la recherche OCR globale sur le modèle de facture unifié.
+7. Remplacer l’accueil générique, unifier la navigation et la sélection d’espace, puis gérer les biens et les protections de suppression.
+8. Faire les corrections d’accessibilité/mobile, synchroniser l’architecture et effectuer la recette fonctionnelle puis opérationnelle.
 
 ## Sources examinées
 
@@ -131,6 +163,9 @@ Pour la location nue relevant du régime réel des revenus fonciers, le BOFiP ra
 - `docs/architecture.md`
 - `docs/superpowers/plans/2026-11-21-web-foundation.md`
 - `web/src/app/chantiers/project-workspace.tsx`
+- `web/src/app/page.tsx`
+- `web/src/app/comptabilite/annual-ledger.tsx`
+- `web/src/app/api/accounting/entries/route.ts`
 - `web/src/server/mandate-pdf.ts`
 - `web/src/app/comptabilite/annual-ledger.tsx`
 - `web/src/app/api/projects/[projectId]/invoices/route.ts`
