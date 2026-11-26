@@ -89,6 +89,16 @@ h2 { margin: 0; font-size: 25px; line-height: 1.2; letter-spacing: -.045em; font
 .initial-setup-form button { justify-self: start; min-height: 2.75rem; padding: .6rem 1rem; }
 .initial-setup-form fieldset:disabled { opacity: .72; }
 .initial-setup-form fieldset:disabled input { cursor: wait; }
+.properties-page { max-width: 980px; padding-bottom: 4rem; }
+.properties-workspace-select { display: grid; gap: .35rem; max-width: 24rem; margin: 1rem 0; font-weight: 600; }
+.properties-form, .property-unit-form { display: grid; gap: .85rem; }
+.properties-form label, .property-unit-form label { width: 100%; max-width: none; }
+.properties-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.property-card { margin: 0; }
+.property-card h3 { margin: 0 0 .5rem; }
+.property-card h4 { margin: 1.25rem 0 .5rem; }
+.property-unit-list { display: grid; gap: .4rem; padding-left: 1.25rem; }
+.property-unit-form { padding-top: 1rem; border-top: 1px solid var(--line); }
 @media (max-width: 700px) {
   .page-shell { width: min(100% - 36px, 540px); }
   .topbar { height: 70px; }
@@ -109,6 +119,7 @@ h2 { margin: 0; font-size: 25px; line-height: 1.2; letter-spacing: -.045em; font
   h2 { font-size: 23px; }
   .module-grid { grid-template-columns: 1fr; gap: 12px; }
   .initial-setup-address-row, .initial-setup-units { grid-template-columns: 1fr; }
+  .properties-grid { grid-template-columns: 1fr; }
   .module-card { min-height: 245px; }
   .footer { align-items: start; flex-direction: column; justify-content: center; gap: 5px; padding: 14px 0; }
 }

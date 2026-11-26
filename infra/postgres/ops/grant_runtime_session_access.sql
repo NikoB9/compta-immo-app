@@ -15,7 +15,7 @@ GRANT SELECT ON app.user_account, app.workspace, app.workspace_membership,
   app.construction_project, app.project_membership TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.resolve_user_id_for_email(text) TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.owner_setup_available() TO app_runtime;
-GRANT EXECUTE ON FUNCTION app_private.bootstrap_first_owner(text, text, text, text, text, text, text, text, text[]) TO app_runtime;
+GRANT EXECUTE ON FUNCTION app_private.bootstrap_first_owner(text, text, text) TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.owns_workspace(uuid) TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.is_project_member(uuid) TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.can_read_document(uuid) TO app_runtime;

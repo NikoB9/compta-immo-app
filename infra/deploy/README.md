@@ -54,7 +54,7 @@ docker compose --env-file infra/deploy/.env up -d app
 docker compose --env-file infra/deploy/.env ps
 ```
 
-Ouvrez ensuite `APP_BASE_URL/configuration-initiale` avec le compte autorisé par Cloudflare Access. Le formulaire crée le propriétaire, son espace, une adresse et exactement trois lots. Le serveur vérifie à nouveau l’identité Access et `INITIAL_OWNER_EMAIL`; la fonction PostgreSQL verrouille l’opération et refuse toute seconde initialisation. Les informations saisies ne sont pas envoyées à Git ni à un script SQL interactif.
+Ouvrez ensuite `APP_BASE_URL/configuration-initiale` avec le compte autorisé par Cloudflare Access. Le formulaire crée uniquement le propriétaire et son espace de travail. Ensuite, la page `/biens` permet d’ajouter autant d’adresses et de lots que nécessaire, à tout moment. Le serveur vérifie à nouveau l’identité Access et `INITIAL_OWNER_EMAIL`; la fonction PostgreSQL verrouille l’opération et refuse toute seconde initialisation. Les informations saisies ne sont pas envoyées à Git ni à un script SQL interactif.
 
 Le service conserve les justificatifs dans le volume `private_documents`, monté au chemin privé configuré dans l’image. Les octets ne sont pas placés dans PostgreSQL. Montez ou sauvegardez ce volume avec des permissions accessibles à l’UID 1001 du conteneur. L’image Next.js est construite en mode autonome et démarre avec l’utilisateur non privilégié `nextjs`.
 

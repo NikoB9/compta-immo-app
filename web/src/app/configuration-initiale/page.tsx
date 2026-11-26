@@ -11,8 +11,8 @@ export default function InitialSetupPage() {
       <p className="eyebrow initial-setup-eyebrow">PREMIÈRE UTILISATION</p>
       <h1>Préparons votre espace.</h1>
       <p role="note" className="initial-setup-intro">
-        Votre identité vient de Cloudflare Access. Ces informations servent à créer votre espace,
-        son adresse et ses trois premiers lots.
+        Votre identité est vérifiée par Cloudflare Access. Cette étape crée votre compte propriétaire
+        et votre espace de travail. Vous pourrez ensuite ajouter autant d’adresses et de lots que nécessaire.
       </p>
       <OwnerSetupForm />
     </main>

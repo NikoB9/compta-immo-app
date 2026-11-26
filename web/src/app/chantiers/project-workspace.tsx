@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { formatEuroCents, parseEuroToCents } from "../../../../packages/domain/src/money.js";
 import { extractInvoiceLocally, type InvoiceOcrResult } from "./invoice-ocr";
 
@@ -497,6 +498,12 @@ export default function ProjectWorkspace() {
           <label>Nom du chantier<input name="name" required maxLength={200} placeholder="Travaux appartement" /></label>
           <button disabled={saving}>{saving ? "Enregistrement…" : "Créer le chantier"}</button>
         </form>
+      </section>}
+
+      {session?.workspaces.some((workspace) => workspace.workspace_id === workspaceId && workspace.role === "owner") && workspaceBuildings.length === 0 && <section className="ledger-panel" aria-labelledby="project-needs-building-title">
+        <h2 id="project-needs-building-title">Ajoutez une adresse pour commencer</h2>
+        <p>Chaque chantier est rattaché à un bien. Enregistrez d’abord une adresse, puis revenez ici pour créer autant de chantiers que nécessaire.</p>
+        <Link className="ledger-link" href="/biens">Gérer mes biens →</Link>
       </section>}
 
       {selectedProject && detail && <>

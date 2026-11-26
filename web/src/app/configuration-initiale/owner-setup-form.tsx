@@ -34,12 +34,6 @@ export default function OwnerSetupForm() {
     const payload = {
       displayName: form.get("displayName"),
       workspaceName: form.get("workspaceName"),
-      buildingLabel: form.get("buildingLabel"),
-      addressLine1: form.get("addressLine1"),
-      addressLine2: form.get("addressLine2"),
-      postalCode: form.get("postalCode"),
-      locality: form.get("locality"),
-      unitRefs: [form.get("unitRef1"), form.get("unitRef2"), form.get("unitRef3")],
     };
 
     try {
@@ -71,8 +65,8 @@ export default function OwnerSetupForm() {
   </section>;
   if (availability === "complete") return <section className="ledger-panel" role="status">
     <h2>Votre espace est prêt.</h2>
-    <p>Votre compte propriétaire, l’adresse et les trois lots ont été créés.</p>
-    <Link className="ledger-link" href="/">Ouvrir Compta Immo</Link>
+    <p>Votre compte propriétaire et votre espace ont été créés. Vous pouvez ajouter vos adresses et lots quand vous le souhaitez.</p>
+    <Link className="ledger-link" href="/biens">Ajouter une adresse</Link>
   </section>;
 
   return (
@@ -84,24 +78,8 @@ export default function OwnerSetupForm() {
           <label>Nom affiché<input name="displayName" autoComplete="name" maxLength={160} required /></label>
         </section>
         <section className="initial-setup-section" aria-labelledby="setup-building-title">
-          <h2 id="setup-building-title">Votre espace et le bâtiment</h2>
+          <h2 id="setup-building-title">Votre espace de travail</h2>
           <label>Nom de l’espace<input name="workspaceName" maxLength={160} required /></label>
-          <label>Nom ou repère du bâtiment<input name="buildingLabel" maxLength={160} required /></label>
-          <label>Adresse<input name="addressLine1" autoComplete="address-line1" maxLength={240} required /></label>
-          <label>Complément d’adresse (facultatif)<input name="addressLine2" autoComplete="address-line2" maxLength={240} /></label>
-          <div className="initial-setup-address-row">
-            <label>Code postal<input name="postalCode" autoComplete="postal-code" maxLength={24} required /></label>
-            <label>Commune<input name="locality" autoComplete="address-level2" maxLength={120} required /></label>
-          </div>
-        </section>
-        <section className="initial-setup-section" aria-labelledby="setup-units-title">
-          <h2 id="setup-units-title">Les trois premiers lots</h2>
-          <p className="initial-setup-hint">Saisissez leurs références comme vous souhaitez les retrouver dans l’application.</p>
-          <div className="initial-setup-units">
-            <label>Lot 1<input name="unitRef1" maxLength={80} required /></label>
-            <label>Lot 2<input name="unitRef2" maxLength={80} required /></label>
-            <label>Lot 3<input name="unitRef3" maxLength={80} required /></label>
-          </div>
         </section>
       </fieldset>
       {message && <p className="ledger-error" role="alert">{message}</p>}

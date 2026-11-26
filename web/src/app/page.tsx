@@ -9,6 +9,7 @@ const modules = [
       "Classez vos recettes et dépenses, retrouvez vos justificatifs et préparez vos exports annuels.",
     status: "Registre annuel",
     href: "/comptabilite",
+    linkText: "Ouvrir le registre annuel →",
   },
   {
     number: "02",
@@ -17,6 +18,15 @@ const modules = [
       "Suivez les avances, les factures et les remboursements dans un espace partagé par chantier.",
     status: "Débours et factures",
     href: "/chantiers",
+    linkText: "Ouvrir le suivi chantier →",
+  },
+  {
+    number: "03",
+    title: "Biens",
+    description: "Organisez vos adresses et ajoutez les lots de chaque logement à votre rythme.",
+    status: "Adresses et lots",
+    href: "/biens",
+    linkText: "Gérer mes biens →",
   },
 ];
 
@@ -74,7 +84,7 @@ export default function Home() {
               <h3>{module.title}</h3>
               <p>{module.description}</p>
               <div className="card-footer">
-                {module.href ? <Link className="ledger-link" href={module.href}>{module.number === "02" ? "Ouvrir le suivi chantier →" : "Ouvrir le registre annuel →"}</Link> : <span>Accès prochainement</span>}
+                {module.href ? <Link className="ledger-link" href={module.href}>{module.linkText}</Link> : <span>Accès prochainement</span>}
               </div>
             </article>
           ))}

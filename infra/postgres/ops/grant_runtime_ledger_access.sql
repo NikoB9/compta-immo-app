@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 
 -- Apply after grant_runtime_session_access.sql; these are the first ledger API grants.
-GRANT SELECT ON app.building_address, app.unit TO app_runtime;
+GRANT SELECT, INSERT ON app.building_address, app.unit TO app_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON app.financial_entry TO app_runtime;
 GRANT INSERT ON app.audit_event TO app_runtime;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA app TO app_runtime;

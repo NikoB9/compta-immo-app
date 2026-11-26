@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const values = validateSetup(body);
     const result = await getDatabasePool().query<{ owner_id: string; workspace_id: string }>(
       `SELECT owner_id, workspace_id
-       FROM app_private.bootstrap_first_owner($1, $2, $3, $4, $5, $6, $7, $8, $9::text[])`,
+       FROM app_private.bootstrap_first_owner($1, $2, $3)`,
       [identity.email, ...values],
     );
     return json({ created: true, workspaceId: result.rows[0]?.workspace_id }, 201);
@@ -42,25 +42,12 @@ export async function POST(request: Request) {
   }
 }
 
-type SetupValues = [string, string, string, string, string | null, string, string, string[]];
+type SetupValues = [string, string];
 
 function validateSetup(body: Record<string, unknown>): SetupValues {
   const displayName = requiredText(body.displayName, 160);
   const workspaceName = requiredText(body.workspaceName, 160);
-  const buildingLabel = requiredText(body.buildingLabel, 160);
-  const addressLine1 = requiredText(body.addressLine1, 240);
-  const addressLine2 = optionalText(body.addressLine2, 240);
-  const postalCode = requiredText(body.postalCode, 24);
-  const locality = requiredText(body.locality, 120);
-  if (!Array.isArray(body.unitRefs) || body.unitRefs.length !== 3) {
-    throw new SetupInputError("Saisissez exactement trois références de lots.");
-  }
-  const unitRefs = body.unitRefs.map((value) => requiredText(value, 80));
-  if (new Set(unitRefs.map((value) => value.toLocaleLowerCase("fr-FR"))).size !== 3) {
-    throw new SetupInputError("Les trois références de lots doivent être différentes.");
-  }
-
-  return [displayName, workspaceName, buildingLabel, addressLine1, addressLine2, postalCode, locality, unitRefs];
+  return [displayName, workspaceName];
 }
 
 function requiredText(value: unknown, maxLength: number) {
@@ -70,11 +57,6 @@ function requiredText(value: unknown, maxLength: number) {
     throw new SetupInputError("Vérifiez les champs obligatoires et leur longueur.");
   }
   return normalized;
-}
-
-function optionalText(value: unknown, maxLength: number) {
-  if (value === undefined || value === null || value === "") return null;
-  return requiredText(value, maxLength);
 }
 
 async function verifiedIdentity(request: Request) {
