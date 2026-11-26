@@ -13,6 +13,7 @@ ALTER ROLE app_runtime NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPAS
 GRANT USAGE ON SCHEMA app, app_private TO app_runtime;
 GRANT SELECT ON app.user_account, app.workspace, app.workspace_membership,
   app.construction_project, app.project_membership TO app_runtime;
+GRANT EXECUTE ON FUNCTION app_private.actor_user_id() TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.resolve_user_id_for_email(text) TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.owner_setup_available() TO app_runtime;
 GRANT EXECUTE ON FUNCTION app_private.bootstrap_first_owner(text, text, text) TO app_runtime;
