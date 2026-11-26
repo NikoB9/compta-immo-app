@@ -67,22 +67,25 @@ Faire des biens, factures et chantiers une chaîne cohérente : les informations
 ### Capacités
 
 - Proposer une création de facture depuis la comptabilité et depuis un chantier, avec un seul dossier de facture, un justificatif, des champs OCR et une écriture comptable liée.
-- Lors d’une création depuis un chantier, créer de façon atomique une écriture de dépense brouillon dans le registre annuel et lier les deux enregistrements via `supplier_invoice.entry_id` ou un modèle relationnel mieux adapté.
+- À l’ajout, enregistrer le total de facture dans le dossier du chantier et l’afficher en comptabilité comme facture en attente de règlement. Les dépenses annuelles payées sont générées à partir des paiements réels, datés et liés à cette facture.
 - Depuis la comptabilité, permettre de rattacher la facture à un chantier, sans recopier ni remplacer la même pièce.
 - Montrer le même statut de contrôle, la même référence, le même montant et des liens vers la facture dans les deux vues. Les catégories comptables et toute qualification fiscale nécessitent validation humaine.
+- À la clôture du chantier, présenter le total des factures, des paiements, des remboursements et du solde restant sans créer une seconde écriture annuelle pour le total du chantier.
 - Gérer les imports, réessais réseau et mises à jour de façon idempotente; protéger les écritures existantes et les factures avec paiements partiels.
 
 ### Critères d’acceptation
 
-- Ajouter une facture au chantier crée une seule facture et une seule ligne de dépense brouillon dans l’année pertinente; elle apparaît ensuite dans les vues chantier et comptabilité.
+- Ajouter une facture au chantier crée une seule facture en attente, visible dans les vues chantier et comptabilité, sans l’inclure par erreur dans les dépenses payées de l’année.
+- Chaque acompte ou paiement réel crée une dépense liée, datée du paiement et affectée à l’année correspondante; des paiements partiels répartis sur plusieurs années ne sont pas regroupés à la date de clôture du chantier.
+- Le récapitulatif de clôture du chantier montre le total engagé et payé, mais ne duplique pas les dépenses déjà portées au registre annuel.
 - Ajouter une facture depuis la comptabilité permet de l’associer à un chantier; le document, l’OCR et les modifications restent communs.
 - Réessayer la même opération ou rafraîchir l’écran ne crée ni doublon de facture ni doublon comptable.
 - Les lignes sont créées en « à vérifier » et la catégorie reste à attribuer/confirmer; aucun statut fiscal n’est attribué par OCR.
 - Les remboursements, avoirs et paiements partiels ne doublent pas le montant de la facture dans le registre.
 
-### Décision métier à prendre avant cette tranche
+### Règle métier retenue pour le périmètre actuel
 
-Quelle date et quel montant l’écriture annuelle doit-elle représenter pour une facture chantier : le total de la facture à sa date, ou les sommes réellement payées à leurs dates de paiement? Le registre actuel sert aussi à préparer le suivi fiscal, donc cette règle détermine l’année et les montants reportés. Recommandation de départ : créer immédiatement une ligne brouillon liée à la facture, mais ne la considérer comme écriture annuelle validée qu’après application de la règle de paiement choisie et confirmation humaine.
+Pour la location nue relevant du régime réel des revenus fonciers, le BOFiP rattache en principe les dépenses à l’année où elles sont effectivement acquittées, quelle que soit la date de facture, d’échéance ou d’exécution des travaux. Les acomptes de travaux suivent l’année de leur versement, même si les travaux ont lieu plus tard. Ainsi, le total du chantier reste une synthèse à sa clôture; le registre annuel suit les paiements à leurs dates. Cette règle ne confirme pas à elle seule qu’une dépense est fiscalement déductible : sa nature et les autres conditions restent à vérifier. Pour les paiements effectués par un mandataire, le parcours devra conserver la preuve du paiement, l’origine des fonds et le rapprochement du mandat; le cas concret devra être confirmé avec le conseil comptable du propriétaire.
 
 ## Tranche 4 — recherche globale dans les factures et leur OCR
 
@@ -115,7 +118,7 @@ Quelle date et quel montant l’écriture annuelle doit-elle représenter pour u
 
 ## Ordre proposé et dépendances
 
-1. Valider la politique d’identité (qui est le mandant/mandataire, quand le SIRET est requis) et la règle date/montant des factures; définir les champs profil et les catégories annuelles.
+1. Valider la politique d’identité (qui est le mandant/mandataire, quand le SIRET est requis), la situation fiscale du propriétaire et le traitement des règlements via le mandataire; définir les champs profil et les catégories annuelles.
 2. Implémenter profil + préremplissage et versionner le schéma du mandat.
 3. Concevoir puis générer le nouveau PDF à partir du schéma versionné; contrôler les documents signés existants.
 4. Unifier la création et la liaison facture/écriture en transaction, avec idempotence et réconciliation projet.
@@ -133,3 +136,6 @@ Quelle date et quel montant l’écriture annuelle doit-elle représenter pour u
 - `web/src/app/api/projects/[projectId]/invoices/route.ts`
 - `web/src/app/api/projects/[projectId]/debours/route.ts`
 - `infra/postgres/migrations/0001_initial.sql`, `0005_invoice_line_extraction.sql`, `0007_invoice_search_indexes.sql`
+- [BOFiP — régime réel des revenus fonciers, conditions et année de paiement](https://bofip.impots.gouv.fr/bofip/3974-PGP.html/identifiant=BOI-RFPI-DECLA-20-20191113)
+- [BOFiP — travaux, acompte et paiement](https://bofip.impots.gouv.fr/bofip/4052-PGP.html/identifiant=BOI-RFPI-BASE-20-30-30-20151228)
+- [Impots.gouv.fr — quels travaux peuvent être déduits](https://www.impots.gouv.fr/particulier/questions/quels-travaux-puis-je-deduire-de-mes-revenus-fonciers)
